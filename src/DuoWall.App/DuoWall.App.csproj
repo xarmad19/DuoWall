@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>DuoWall</AssemblyName>
+    <RootNamespace>DuoWall.App</RootNamespace>
+    <Product>DuoWall by SRMD</Product>
+    <Company>SRMD</Company>
+    <Version>1.0.0</Version>
+    <AssemblyTitle>DuoWall by SRMD – Smart Multi-Monitor Wallpaper Manager</AssemblyTitle>
+    <ApplicationIcon>Assets\duowall.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="WPF-UI" Version="3.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\DuoWall.Core\DuoWall.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\duowall.ico" />
+  </ItemGroup>
+
+</Project>

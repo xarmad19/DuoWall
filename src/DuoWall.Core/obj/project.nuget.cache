@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "dgSpecHash": "+sbx/ySm5e0=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\Sarmad\\.gemini\\antigravity\\scratch\\DuoWall\\src\\DuoWall.Core\\DuoWall.Core.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\Sarmad\\.nuget\\packages\\microsoft.data.sqlite\\8.0.11\\microsoft.data.sqlite.8.0.11.nupkg.sha512",
+    "C:\\Users\\Sarmad\\.nuget\\packages\\microsoft.data.sqlite.core\\8.0.11\\microsoft.data.sqlite.core.8.0.11.nupkg.sha512",
+    "C:\\Users\\Sarmad\\.nuget\\packages\\microsoft.net.illink.tasks\\8.0.33\\microsoft.net.illink.tasks.8.0.33.nupkg.sha512",
+    "C:\\Users\\Sarmad\\.nuget\\packages\\skiasharp\\2.88.9\\skiasharp.2.88.9.nupkg.sha512",
+    "C:\\Users\\Sarmad\\.nuget\\packages\\skiasharp.nativeassets.macos\\2.88.9\\skiasharp.nativeassets.macos.2.88.9.nupkg.sha512",
+    "C:\\Users\\Sarmad\\.nuget\\packages\\skiasharp.nativeassets.win32\\2.88.9\\skiasharp.nativeassets.win32.2.88.9.nupkg.sha512",
+    "C:\\Users\\Sarmad\\.nuget\\packages\\sqlitepclraw.bundle_e_sqlite3\\2.1.6\\sqlitepclraw.bundle_e_sqlite3.2.1.6.nupkg.sha512",
+    "C:\\Users\\Sarmad\\.nuget\\packages\\sqlitepclraw.core\\2.1.6\\sqlitepclraw.core.2.1.6.nupkg.sha512",
+    "C:\\Users\\Sarmad\\.nuget\\packages\\sqlitepclraw.lib.e_sqlite3\\2.1.6\\sqlitepclraw.lib.e_sqlite3.2.1.6.nupkg.sha512",
+    "C:\\Users\\Sarmad\\.nuget\\packages\\sqlitepclraw.provider.e_sqlite3\\2.1.6\\sqlitepclraw.provider.e_sqlite3.2.1.6.nupkg.sha512",
+    "C:\\Users\\Sarmad\\.nuget\\packages\\system.memory\\4.5.3\\system.memory.4.5.3.nupkg.sha512",
+    "C:\\Users\\Sarmad\\.nuget\\packages\\microsoft.netcore.app.runtime.win-x64\\8.0.33\\microsoft.netcore.app.runtime.win-x64.8.0.33.nupkg.sha512",
+    "C:\\Users\\Sarmad\\.nuget\\packages\\microsoft.windowsdesktop.app.runtime.win-x64\\8.0.33\\microsoft.windowsdesktop.app.runtime.win-x64.8.0.33.nupkg.sha512",
+    "C:\\Users\\Sarmad\\.nuget\\packages\\microsoft.aspnetcore.app.runtime.win-x64\\8.0.33\\microsoft.aspnetcore.app.runtime.win-x64.8.0.33.nupkg.sha512"
+  ],
+  "logs": []
+}

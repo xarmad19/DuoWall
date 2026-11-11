@@ -1,0 +1,117 @@
+<Application x:Class="DuoWall.App.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:helpers="clr-namespace:DuoWall.App.Helpers">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ui:ThemesDictionary Theme="Dark" />
+                <ui:ControlsDictionary />
+            </ResourceDictionary.MergedDictionaries>
+
+            <helpers:BoolToVisibilityConverter x:Key="BoolToVis" />
+            <helpers:InvertBoolConverter x:Key="InvBool" />
+            <helpers:ZeroCountToVisibilityConverter x:Key="ZeroToVis" />
+            <helpers:StringNotEmptyToVisibilityConverter x:Key="StrToVis" />
+            <helpers:StringNotEmptyToBoolConverter x:Key="StrToBool" />
+            <helpers:NullToVisibilityConverter x:Key="NullToVis" />
+            <helpers:EnumEqualsConverter x:Key="EnumEq" />
+            <helpers:EqualsMultiConverter x:Key="MultiEq" />
+            <helpers:BoolToInfoBarSeverityConverter x:Key="BoolToSeverity" />
+
+            <!-- Elevated Surface Card Style -->
+            <Style x:Key="DuoCardStyle" TargetType="Border">
+                <Setter Property="Background" Value="{DynamicResource CardBackgroundFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource CardStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="CornerRadius" Value="12" />
+                <Setter Property="Padding" Value="18" />
+            </Style>
+
+            <!-- Compact Filter / Mode Pill RadioButton -->
+            <Style x:Key="PillRadioStyle" TargetType="RadioButton">
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Setter Property="Background" Value="{DynamicResource ControlFillColorDefaultBrush}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource ControlStrokeColorDefaultBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+                <Setter Property="Padding" Value="14,7" />
+                <Setter Property="Margin" Value="0,0,8,8" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="FontSize" Value="12.5" />
+                <Setter Property="FontWeight" Value="Medium" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RadioButton">
+                            <Border x:Name="PillBorder"
+                                    Background="{TemplateBinding Background}"
+                                    BorderBrush="{TemplateBinding BorderBrush}"
+                                    BorderThickness="{TemplateBinding BorderThickness}"
+                                    CornerRadius="16"
+                                    Padding="{TemplateBinding Padding}">
+                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="PillBorder" Property="BorderBrush" Value="#60A5FA" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="PillBorder" Property="Background" Value="#2563EB" />
+                                    <Setter TargetName="PillBorder" Property="BorderBrush" Value="#60A5FA" />
+                                    <Setter Property="Foreground" Value="White" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- Sidebar Navigation Item Style -->
+            <Style x:Key="NavRailRadioStyle" TargetType="RadioButton">
+                <Setter Property="Foreground" Value="{DynamicResource TextFillColorSecondaryBrush}" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Padding" Value="14,11" />
+                <Setter Property="Margin" Value="8,2" />
+                <Setter Property="Cursor" Value="Hand" />
+                <Setter Property="FontSize" Value="13.5" />
+                <Setter Property="FontWeight" Value="Medium" />
+                <Setter Property="HorizontalContentAlignment" Value="Left" />
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="RadioButton">
+                            <Border x:Name="NavBg"
+                                    Background="{TemplateBinding Background}"
+                                    CornerRadius="8"
+                                    Padding="{TemplateBinding Padding}">
+                                <Grid>
+                                    <Border x:Name="ActiveIndicator"
+                                            Width="3" Height="18"
+                                            CornerRadius="2"
+                                            Background="#60A5FA"
+                                            HorizontalAlignment="Left"
+                                            Margin="-10,0,0,0"
+                                            Visibility="Collapsed" />
+                                    <ContentPresenter HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}"
+                                                      VerticalAlignment="Center" />
+                                </Grid>
+                            </Border>
+                            <ControlTemplate.Triggers>
+                                <Trigger Property="IsMouseOver" Value="True">
+                                    <Setter TargetName="NavBg" Property="Background" Value="{DynamicResource SubtleFillColorSecondaryBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                </Trigger>
+                                <Trigger Property="IsChecked" Value="True">
+                                    <Setter TargetName="NavBg" Property="Background" Value="{DynamicResource SubtleFillColorTertiaryBrush}" />
+                                    <Setter TargetName="ActiveIndicator" Property="Visibility" Value="Visible" />
+                                    <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                                    <Setter Property="FontWeight" Value="SemiBold" />
+                                </Trigger>
+                            </ControlTemplate.Triggers>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

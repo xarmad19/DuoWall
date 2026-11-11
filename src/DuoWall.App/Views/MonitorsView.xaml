@@ -1,0 +1,180 @@
+<UserControl x:Class="DuoWall.App.Views.MonitorsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:controls="clr-namespace:DuoWall.App.Controls">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="24,18,24,24">
+        <StackPanel>
+            <!-- Header -->
+            <DockPanel Margin="0,0,0,14">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ComboBox Width="280"
+                              ItemsSource="{Binding SimulationPresets}"
+                              SelectedItem="{Binding SelectedSimulationPreset}"
+                              Margin="0,0,10,0" />
+                    <ui:Button Appearance="Primary" Command="{Binding RefreshHardwareMonitorsCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="ArrowClockwise24" FontSize="15" Margin="0,0,6,0" />
+                            <TextBlock Text="Detect Displays" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </ui:Button>
+                </StackPanel>
+
+                <StackPanel>
+                    <TextBlock Text="Monitor Setup &amp; Calibration" FontSize="26" FontWeight="Bold" />
+                    <TextBlock Text="{Binding CombinedGeometrySummary}" FontSize="12.5"
+                               Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0" />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Interactive Visual Monitor Topology & Alignment -->
+            <Border Style="{StaticResource DuoCardStyle}" Margin="0,0,0,16" Padding="14">
+                <StackPanel>
+                    <DockPanel Margin="4,0,4,10">
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <ui:Button Appearance="Secondary" Padding="10,5" Margin="0,0,6,0"
+                                       Command="{Binding ApplyPhysicalPresetCommand}" CommandParameter="AlignBottom">
+                                <TextBlock Text="Align Desk Bottoms" FontSize="12" />
+                            </ui:Button>
+                            <ui:Button Appearance="Secondary" Padding="10,5" Margin="0,0,6,0"
+                                       Command="{Binding ApplyPhysicalPresetCommand}" CommandParameter="AlignCenter">
+                                <TextBlock Text="Align Centers" FontSize="12" />
+                            </ui:Button>
+                            <ui:Button Appearance="Secondary" Padding="10,5"
+                                       Command="{Binding ApplyPhysicalPresetCommand}" CommandParameter="AlignTop">
+                                <TextBlock Text="Align Tops" FontSize="12" />
+                            </ui:Button>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <ui:SymbolIcon Symbol="Desktop24" FontSize="18" Foreground="#60A5FA" Margin="0,0,8,0" />
+                            <TextBlock Text="Proportional Monitor Arrangement Editor" FontSize="15" FontWeight="SemiBold" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <controls:MultiMonitorPreviewControl x:Name="MonitorEditorPreview"
+                                                         Height="260"
+                                                         Plan="{Binding CurrentPlan}"
+                                                         PreviewImageSource="{Binding StagedPreviewSource}"
+                                                         BackgroundColorHex="{Binding BackgroundColorHex}"
+                                                         ShowMonitorLabels="True"
+                                                         SelectedMonitorId="{Binding SelectedMonitorId, Mode=TwoWay}"
+                                                         DiskCacheDirectory="{Binding Settings.ThumbnailCacheDirectory}"
+                                                         IsInteractive="True" />
+                </StackPanel>
+            </Border>
+
+            <!-- Individual Monitor Hardware Cards -->
+            <ItemsControl ItemsSource="{Binding Monitors}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border Width="390" Margin="0,0,14,14" Style="{StaticResource DuoCardStyle}">
+                            <StackPanel>
+                                <DockPanel Margin="0,0,0,10">
+                                    <Border DockPanel.Dock="Right" CornerRadius="8" Padding="9,3"
+                                            Background="#1E3A8A"
+                                            Visibility="{Binding IsPrimary, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="PRIMARY" Foreground="#DBEAFE" FontSize="10.5" FontWeight="Bold" />
+                                    </Border>
+                                    <StackPanel>
+                                        <TextBlock Text="{Binding DisplayLabel}" FontSize="16" FontWeight="Bold" />
+                                        <TextBlock FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                            <Run Text="{Binding Manufacturer, Mode=OneWay}" />
+                                            <Run Text=" · " />
+                                            <Run Text="{Binding DeviceName, Mode=OneWay}" />
+                                        </TextBlock>
+                                    </StackPanel>
+                                </DockPanel>
+
+                                <!-- Hardware Specs Grid -->
+                                <Grid Margin="0,4,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="135" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="24" />
+                                        <RowDefinition Height="24" />
+                                        <RowDefinition Height="24" />
+                                        <RowDefinition Height="24" />
+                                        <RowDefinition Height="24" />
+                                        <RowDefinition Height="24" />
+                                        <RowDefinition Height="24" />
+                                    </Grid.RowDefinitions>
+
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="Resolution" Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="12" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1" FontWeight="SemiBold" FontSize="12">
+                                        <Run Text="{Binding ResolutionLabel, Mode=OneWay}" />
+                                        <Run Text=" (" /><Run Text="{Binding AspectRatioLabel, Mode=OneWay}" /><Run Text=")" />
+                                    </TextBlock>
+
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Text="Virtual Position" Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="12" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding VirtualPositionLabel}" FontSize="12" />
+
+                                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Physical Size" Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="12" />
+                                    <TextBlock Grid.Row="2" Grid.Column="1" FontSize="12">
+                                        <Run Text="{Binding PhysicalSizeLabel, Mode=OneWay}" />
+                                        <Run Text=" · " />
+                                        <Run Text="{Binding PpiLabel, Mode=OneWay}" />
+                                    </TextBlock>
+
+                                    <TextBlock Grid.Row="3" Grid.Column="0" Text="Size Source" Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="12" />
+                                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding EdidSourceLabel}" FontSize="12" />
+
+                                    <TextBlock Grid.Row="4" Grid.Column="0" Text="DPI Scaling" Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="12" />
+                                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding DpiScaleLabel}" FontSize="12" />
+
+                                    <TextBlock Grid.Row="5" Grid.Column="0" Text="Orientation" Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="12" />
+                                    <TextBlock Grid.Row="5" Grid.Column="1" FontSize="12">
+                                        <Run Text="{Binding OrientationLabel, Mode=OneWay}" />
+                                        <Run Text=" · " />
+                                        <Run Text="{Binding RefreshRateLabel, Mode=OneWay}" />
+                                    </TextBlock>
+
+                                    <TextBlock Grid.Row="6" Grid.Column="0" Text="Working Area" Foreground="{DynamicResource TextFillColorTertiaryBrush}" FontSize="12" />
+                                    <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding WorkingAreaLabel}" FontSize="11.5" TextTrimming="CharacterEllipsis" />
+                                </Grid>
+
+                                <!-- Physical Calibration Controls -->
+                                <Border Background="{DynamicResource ControlFillColorDefaultBrush}" CornerRadius="8" Padding="10">
+                                    <StackPanel>
+                                        <DockPanel Margin="0,0,0,6">
+                                            <CheckBox Content="Include in Panoramic Span" IsChecked="{Binding IsIncluded}" FontSize="12" />
+                                        </DockPanel>
+                                        <DockPanel>
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding UserOffsetMmY, StringFormat='{}{0:+0;-0;0} mm'}" FontSize="11.5" />
+                                            <TextBlock Text="Physical Desk Vertical Offset" FontSize="11.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        </DockPanel>
+                                        <Slider Minimum="-150" Maximum="150" TickFrequency="1" IsSnapToTickEnabled="True"
+                                                Value="{Binding UserOffsetMmY}" Margin="0,2,0,6" />
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="10" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0">
+                                                <TextBlock Text="{Binding BezelLeftMm, StringFormat='Left Bezel: {0:0} mm'}" FontSize="11" />
+                                                <Slider Minimum="0" Maximum="40" Value="{Binding BezelLeftMm}" />
+                                            </StackPanel>
+                                            <StackPanel Grid.Column="2">
+                                                <TextBlock Text="{Binding BezelRightMm, StringFormat='Right Bezel: {0:0} mm'}" FontSize="11" />
+                                                <Slider Minimum="0" Maximum="40" Value="{Binding BezelRightMm}" />
+                                            </StackPanel>
+                                        </Grid>
+                                    </StackPanel>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
+
