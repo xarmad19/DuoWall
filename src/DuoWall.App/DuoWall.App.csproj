@@ -6,19 +6,23 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AssemblyName>DuoWall</AssemblyName>
     <RootNamespace>DuoWall.App</RootNamespace>
     <Product>DuoWall by SRMD</Product>
     <Company>SRMD</Company>
-    <Version>1.0.0</Version>
+    <Version>2.0.0</Version>
     <AssemblyTitle>DuoWall by SRMD – Smart Multi-Monitor Wallpaper Manager</AssemblyTitle>
     <ApplicationIcon>Assets\duowall.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.3.2" />
+    <PackageReference Include="LibVLCSharp" Version="3.10.2" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
+    <PackageReference Include="System.Management" Version="8.0.0" />
+    <PackageReference Include="VideoLAN.LibVLC.Windows" Version="3.0.24" />
     <PackageReference Include="WPF-UI" Version="3.0.5" />
   </ItemGroup>
 

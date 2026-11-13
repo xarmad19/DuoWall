@@ -72,7 +72,7 @@ public sealed class SkiaWallpaperCompositor
             Directory.CreateDirectory(outputDirectory);
             var bgColor = ParseHexColor(backgroundColorHex);
             var generated = new Dictionary<string, string>();
-            var decodedSources = new Dictionary<string, SKImage>(StringComparer.OrdinalIgnoreCase);
+            var decodedSources = new Dictionary<(string Path, bool FlipH, bool FlipV), SKImage>();
 
             try
             {
@@ -92,11 +92,15 @@ public sealed class SkiaWallpaperCompositor
                         !string.IsNullOrWhiteSpace(slice.SourceImagePath) &&
                         File.Exists(slice.SourceImagePath))
                     {
-                        if (!decodedSources.TryGetValue(slice.SourceImagePath, out srcImage))
+                        var key = (slice.SourceImagePath.ToLowerInvariant(), slice.FlipHorizontal, slice.FlipVertical);
+                        if (!decodedSources.TryGetValue(key, out srcImage))
                         {
-                            using var bmp = LoadOrientedBitmap(slice.SourceImagePath);
+                            using var bmp = ApplyFlip(
+                                LoadOrientedBitmap(slice.SourceImagePath),
+                                slice.FlipHorizontal,
+                                slice.FlipVertical);
                             srcImage = SKImage.FromBitmap(bmp);
-                            decodedSources[slice.SourceImagePath] = srcImage;
+                            decodedSources[key] = srcImage;
                         }
                     }
 
@@ -182,6 +186,62 @@ public sealed class SkiaWallpaperCompositor
         }
 
         return new SKColor(13, 16, 23);
+    }
+
+    /// <summary>
+    /// Samples the average border color of a wallpaper image to suggest a seamless plain gap fill color.
+    /// </summary>
+    public static string SampleAverageEdgeHex(string imagePath)
+    {
+        using var bmp = LoadOrientedBitmap(imagePath);
+        int w = bmp.Width;
+        int h = bmp.Height;
+        if (w <= 0 || h <= 0) return "#0D1017";
+
+        long r = 0, g = 0, b = 0, count = 0;
+        int stepX = Math.Max(1, w / 48);
+        int stepY = Math.Max(1, h / 24);
+
+        for (int x = 0; x < w; x += stepX)
+        {
+            var top = bmp.GetPixel(x, 0);
+            var bot = bmp.GetPixel(x, h - 1);
+            r += top.Red + bot.Red;
+            g += top.Green + bot.Green;
+            b += top.Blue + bot.Blue;
+            count += 2;
+        }
+        for (int y = 0; y < h; y += stepY)
+        {
+            var left = bmp.GetPixel(0, y);
+            var right = bmp.GetPixel(w - 1, y);
+            r += left.Red + right.Red;
+            g += left.Green + right.Green;
+            b += left.Blue + right.Blue;
+            count += 2;
+        }
+
+        if (count == 0) return "#0D1017";
+        return $"#{r / count:X2}{g / count:X2}{b / count:X2}";
+    }
+
+    private static SKBitmap ApplyFlip(SKBitmap src, bool flipHorizontal, bool flipVertical)
+    {
+        if (!flipHorizontal && !flipVertical)
+            return src;
+
+        var dst = new SKBitmap(src.Width, src.Height, src.ColorType, src.AlphaType);
+        using (var canvas = new SKCanvas(dst))
+        {
+            canvas.Scale(
+                flipHorizontal ? -1f : 1f,
+                flipVertical ? -1f : 1f,
+                src.Width * 0.5f,
+                src.Height * 0.5f);
+            canvas.DrawBitmap(src, 0, 0);
+        }
+        src.Dispose();
+        return dst;
     }
 
     private static bool IsOrientationTransposed(SKEncodedOrigin origin) => origin is

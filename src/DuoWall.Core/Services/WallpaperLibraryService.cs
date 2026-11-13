@@ -62,7 +62,8 @@ public sealed class WallpaperLibraryService
         WallpaperItem item,
         string downloadDirectory,
         IProgress<double>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        IWallpaperSourceProvider? overrideProvider = null)
     {
         if (item.IsDownloaded && !string.IsNullOrWhiteSpace(item.LocalOriginalPath))
         {
@@ -105,7 +106,8 @@ public sealed class WallpaperLibraryService
             };
         }
 
-        var result = await _provider.DownloadHighResAsync(item, downloadDirectory, progress, cancellationToken);
+        var provider = overrideProvider ?? _provider;
+        var result = await provider.DownloadHighResAsync(item, downloadDirectory, progress, cancellationToken);
         if (result.Success)
         {
             _db.UpsertWallpaper(item);

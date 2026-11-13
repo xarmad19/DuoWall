@@ -3,25 +3,28 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
              xmlns:controls="clr-namespace:DuoWall.App.Controls">
-    <Grid Margin="24,18,24,16">
+    <Grid Margin="24,16,24,14">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
-            <RowDefinition Height="*" />
-            <RowDefinition Height="Auto" />
+            <RowDefinition Height="2*" MinHeight="170" />
+            <RowDefinition Height="10" />
+            <RowDefinition Height="1.35*" MinHeight="175" />
         </Grid.RowDefinitions>
 
         <!-- Header -->
-        <DockPanel Grid.Row="0" Margin="0,0,0,12">
+        <DockPanel Grid.Row="0" Margin="0,0,0,10">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                <CheckBox Content="Show Monitor Boundaries &amp; Labels"
-                          IsChecked="{Binding ShowMonitorLabels}"
-                          Margin="0,0,14,0" VerticalAlignment="Center" />
+                <ui:Button Appearance="Secondary" Command="{Binding ImportLayoutPresetCommand}"
+                           Margin="0,0,8,0" ToolTip="Import saved Placement + Widgets preset backup (.duowall-preset)">
+                    <TextBlock Text="Import Preset" />
+                </ui:Button>
+                <ui:Button Appearance="Secondary" Command="{Binding SavePlacementPreferencesCommand}"
+                           Margin="0,0,8,0" ToolTip="Save preferences and export a preset backup file (.duowall-preset) with wallpaper placement and desktop widgets">
+                    <TextBlock Text="Save Preferences &amp; Backup" />
+                </ui:Button>
                 <ui:Button Appearance="Secondary" Command="{Binding ResetPlacementCommand}" Margin="0,0,8,0">
                     <TextBlock Text="Reset Auto" />
-                </ui:Button>
-                <ui:Button Appearance="Secondary" Command="{Binding SavePlacementPreferencesCommand}" Margin="0,0,8,0">
-                    <TextBlock Text="Save Preferences" />
                 </ui:Button>
                 <ui:Button Appearance="Primary" Command="{Binding ApplyWallpaperCommand}">
                     <StackPanel Orientation="Horizontal">
@@ -38,30 +41,97 @@
             </StackPanel>
         </DockPanel>
 
-        <!-- Insufficient Resolution Warning Banner -->
-        <ui:InfoBar Grid.Row="1"
-                    Title="Resolution Advisory"
-                    Severity="Warning"
-                    Message="{Binding ResolutionAdvisory}"
-                    IsOpen="{Binding ResolutionAdvisory, Converter={StaticResource StrToBool}}"
-                    Visibility="{Binding ResolutionAdvisory, Converter={StaticResource StrToVis}}"
-                    IsClosable="False"
-                    Margin="0,0,0,10" />
+        <!-- Insufficient Resolution Warning Banner + Video Framing Indicator -->
+        <StackPanel Grid.Row="1">
+            <ui:InfoBar Title="Resolution Advisory"
+                        Severity="Warning"
+                        Message="{Binding ResolutionAdvisory}"
+                        IsOpen="{Binding ResolutionAdvisory, Converter={StaticResource StrToBool}}"
+                        Visibility="{Binding ResolutionAdvisory, Converter={StaticResource StrToVis}}"
+                        IsClosable="False"
+                        Margin="0,0,0,8" />
 
-        <!-- Interactive Proportional Preview Surface -->
-        <Border Grid.Row="2" Style="{StaticResource DuoCardStyle}" Padding="10" Margin="0,0,0,14" MinHeight="270">
+            <Border Background="#243B82F6" BorderBrush="#6060A5FA" BorderThickness="1" CornerRadius="8"
+                    Padding="12,7" Margin="0,0,0,8"
+                    Visibility="{Binding IsVideoWallpaperStaged, Converter={StaticResource BoolToVis}}">
+                <DockPanel>
+                    <ui:Button DockPanel.Dock="Right" Appearance="Secondary" Command="{Binding ExitVideoStagingCommand}" Padding="10,4">
+                        <TextBlock Text="Switch to Static Image" FontSize="12" />
+                    </ui:Button>
+                    <TextBlock Text="LIVE VIDEO FRAMING MODE · Previewing a still frame from your video wallpaper. Move, zoom, flip, or align widgets, then click Apply Wallpaper to update the live desktop video."
+                               FontSize="12" Foreground="#BFDBFE" VerticalAlignment="Center" TextWrapping="Wrap" />
+                </DockPanel>
+            </Border>
+        </StackPanel>
+
+        <!-- Interactive Resizable Proportional Preview Surface -->
+        <Border Grid.Row="2" Style="{StaticResource DuoCardStyle}" Padding="10" Margin="0,0,0,2" MinHeight="170">
             <controls:MultiMonitorPreviewControl x:Name="StudioPreview"
                                                  Plan="{Binding CurrentPlan}"
                                                  PreviewImageSource="{Binding StagedPreviewSource}"
                                                  BackgroundColorHex="{Binding BackgroundColorHex}"
                                                  ShowMonitorLabels="{Binding ShowMonitorLabels}"
                                                  SelectedMonitorId="{Binding SelectedMonitorId, Mode=TwoWay}"
+                                                 Widgets="{Binding WidgetStudio.Widgets}"
+                                                 ShowWidgets="{Binding WidgetStudio.ShowWidgetsInPlacementStudio}"
+                                                 IsWidgetEditMode="{Binding WidgetStudio.IsDesktopEditMode}"
+                                                 IsBoxSelectMode="{Binding IsStudioBoxSelectMode}"
+                                                 EnableSnapToGrid="{Binding WidgetStudio.EnableSnapToGrid}"
+                                                 GridSizePx="{Binding WidgetStudio.GridSizePx}"
+                                                 SelectedWidgetId="{Binding WidgetStudio.SelectedWidgetId, Mode=TwoWay}"
+                                                 CurrentZoom="{Binding Zoom}"
+                                                 CurrentPanX="{Binding PanX}"
+                                                 CurrentPanY="{Binding PanY}"
+                                                 CurrentFocalX="{Binding FocalX}"
+                                                 CurrentFocalY="{Binding FocalY}"
                                                  DiskCacheDirectory="{Binding Settings.ThumbnailCacheDirectory}"
                                                  IsInteractive="True" />
         </Border>
 
-        <!-- Positioning & Mode Controls -->
-        <Grid Grid.Row="3">
+        <!-- Drag Handle to Resize Monitor Preview Height -->
+        <GridSplitter Grid.Row="3" Height="8" HorizontalAlignment="Stretch" VerticalAlignment="Center"
+                      ResizeDirection="Rows" ShowsPreview="True" Cursor="SizeNS" Background="Transparent"
+                      ToolTip="Drag up or down to resize the Monitor Preview window">
+            <GridSplitter.Template>
+                <ControlTemplate TargetType="GridSplitter">
+                    <Grid Background="Transparent">
+                        <Border Width="68" Height="4" CornerRadius="2"
+                                Background="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Grid>
+                </ControlTemplate>
+            </GridSplitter.Template>
+        </GridSplitter>
+
+        <!-- Uncluttered Scrollable Placement & Overlay Controls -->
+        <ScrollViewer Grid.Row="4" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- Compact Overlay & Widget Alignment Bar -->
+                <Border Background="{DynamicResource ControlFillColorDefaultBrush}"
+                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                        BorderThickness="1" CornerRadius="10" Padding="12,7" Margin="0,2,0,10">
+                    <DockPanel>
+                        <ui:Button DockPanel.Dock="Right" Appearance="Secondary" Padding="10,4"
+                                   Command="{Binding WidgetStudio.ToggleLayoutLockCommand}">
+                            <TextBlock Text="{Binding WidgetStudio.LayoutLockLabel}" FontSize="11.5" FontWeight="SemiBold" />
+                        </ui:Button>
+                        <WrapPanel VerticalAlignment="Center">
+                            <CheckBox Content="Auto-Apply Live" IsChecked="{Binding AutoApplyStudioChanges}" Margin="0,0,14,0" VerticalAlignment="Center"
+                                      ToolTip="Automatically apply wallpaper to your desktop after moving or resizing it in Placement Studio" />
+                            <CheckBox Content="Show Monitor Boundaries" IsChecked="{Binding ShowMonitorLabels}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                            <CheckBox Content="Show Widgets" IsChecked="{Binding WidgetStudio.ShowWidgetsInPlacementStudio}" Margin="0,0,14,0" VerticalAlignment="Center" />
+                            <CheckBox Content="Box Select Widgets" IsChecked="{Binding IsStudioBoxSelectMode}" Margin="0,0,14,0" VerticalAlignment="Center"
+                                      ToolTip="Drag a box across multiple widgets to select and move them together (or hold Shift / Ctrl+Click)" />
+                            <CheckBox Content="Snap Grid" IsChecked="{Binding WidgetStudio.EnableSnapToGrid}" Margin="0,0,8,0" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding WidgetStudio.GridSizePx, StringFormat='{}{0}px'}" VerticalAlignment="Center" FontSize="11.5" Margin="0,0,6,0" />
+                            <Slider Minimum="4" Maximum="64" TickFrequency="4" IsSnapToTickEnabled="True"
+                                    Width="78" VerticalAlignment="Center" Value="{Binding WidgetStudio.GridSizePx}" />
+                        </WrapPanel>
+                    </DockPanel>
+                </Border>
+
+                <!-- 3 Clean Placement Control Columns -->
+                <Grid>
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="1.15*" />
                 <ColumnDefinition Width="1*" />
@@ -69,7 +139,7 @@
             </Grid.ColumnDefinitions>
 
             <!-- Card 1: Placement Mode & Coordinate Geometry -->
-            <Border Grid.Column="0" Style="{StaticResource DuoCardStyle}" Margin="0,0,10,0">
+            <Border Grid.Column="0" Style="{StaticResource DuoCardStyle}" Padding="14" Margin="0,0,10,0">
                 <StackPanel>
                     <TextBlock Text="PLACEMENT MODE" FontSize="11" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,8" />
@@ -107,41 +177,145 @@
                         <ComboBox Grid.Column="2" ItemsSource="{Binding PhysicalAlignments}" SelectedItem="{Binding PhysicalAlignment}" />
                     </Grid>
 
-                    <DockPanel Margin="0,2,0,0">
+                    <DockPanel Margin="0,2,0,10">
                         <CheckBox Content="Bezel Gap Compensation" IsChecked="{Binding EnableBezelCompensation}" VerticalAlignment="Center" />
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
-                            <ItemsControl ItemsSource="{Binding BackgroundSwatches}" VerticalAlignment="Center" Margin="0,0,6,0">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <StackPanel Orientation="Horizontal" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Button Width="18" Height="18" Margin="2,0" Padding="0" Cursor="Hand"
-                                                Command="{Binding DataContext.SetBackgroundColorCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
-                                                CommandParameter="{Binding}"
-                                                ToolTip="{Binding}">
-                                            <Button.Template>
-                                                <ControlTemplate TargetType="Button">
-                                                    <Border CornerRadius="9" Background="{Binding}" BorderBrush="#66FFFFFF" BorderThickness="1" />
-                                                </ControlTemplate>
-                                            </Button.Template>
-                                        </Button>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                            <ui:TextBox Width="80" Text="{Binding BackgroundColorHex, UpdateSourceTrigger=PropertyChanged}" FontSize="11.5" />
-                        </StackPanel>
                     </DockPanel>
+
+                    <!-- Plain Background Gap Fill Color -->
+                    <TextBlock Text="PLAIN BACKGROUND FILL (GAP COLOR)" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,6" />
+                    <WrapPanel VerticalAlignment="Center">
+                        <Border Width="26" Height="22" CornerRadius="6"
+                                Background="{Binding NormalizedBackgroundBrushHex}"
+                                BorderBrush="#88FFFFFF" BorderThickness="1"
+                                Margin="0,0,8,4"
+                                ToolTip="Active gap fill color" />
+
+                        <ItemsControl ItemsSource="{Binding BackgroundSwatches}" VerticalAlignment="Center" Margin="0,0,6,4">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <WrapPanel />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Width="19" Height="19" Margin="2" Padding="0" Cursor="Hand"
+                                            Command="{Binding DataContext.SetBackgroundColorCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}"
+                                            ToolTip="{Binding}">
+                                        <Button.Template>
+                                            <ControlTemplate TargetType="Button">
+                                                <Border CornerRadius="10" Background="{Binding}" BorderBrush="#77FFFFFF" BorderThickness="1" />
+                                            </ControlTemplate>
+                                        </Button.Template>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+
+                        <ToggleButton x:Name="CustomColorBtn"
+                                      Style="{StaticResource PillToggleStyle}"
+                                      IsChecked="{Binding IsColorPickerOpen, Mode=TwoWay}"
+                                      Padding="9,4" Margin="0,0,6,4"
+                                      ToolTip="Open custom RGB color mixer">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Color20" FontSize="14" Margin="0,0,5,0" />
+                                <TextBlock Text="Custom..." FontSize="11.5" />
+                            </StackPanel>
+                        </ToggleButton>
+
+                        <ui:Button Appearance="Secondary" Padding="9,4" Margin="0,0,0,4"
+                                   Command="{Binding SampleEdgeBackgroundColorCommand}"
+                                   ToolTip="Auto-match plain background color to wallpaper borders">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Eyedropper20" FontSize="13" Margin="0,0,5,0" />
+                                <TextBlock Text="Match Edge" FontSize="11.5" />
+                            </StackPanel>
+                        </ui:Button>
+
+                        <!-- Floating Custom RGB Color Picker Popup -->
+                        <Popup PlacementTarget="{Binding ElementName=CustomColorBtn}"
+                               Placement="Top"
+                               IsOpen="{Binding IsColorPickerOpen, Mode=TwoWay}"
+                               StaysOpen="False"
+                               AllowsTransparency="True">
+                            <Border Width="270" Padding="14" CornerRadius="12"
+                                    Background="{DynamicResource ApplicationBackgroundBrush}"
+                                    BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                    BorderThickness="1">
+                                <StackPanel>
+                                    <DockPanel Margin="0,0,0,10">
+                                        <Border DockPanel.Dock="Right" Width="36" Height="22" CornerRadius="6"
+                                                Background="{Binding NormalizedBackgroundBrushHex}"
+                                                BorderBrush="#88FFFFFF" BorderThickness="1" />
+                                        <TextBlock Text="Custom Gap Background Color" FontSize="12.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    </DockPanel>
+
+                                    <DockPanel Margin="0,0,0,2">
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding BgRed}" FontSize="11.5" />
+                                        <TextBlock Text="Red" FontSize="11.5" Foreground="#F87171" />
+                                    </DockPanel>
+                                    <Slider Minimum="0" Maximum="255" IsSnapToTickEnabled="True" TickFrequency="1"
+                                            Value="{Binding BgRed}" Margin="0,0,0,6" />
+
+                                    <DockPanel Margin="0,0,0,2">
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding BgGreen}" FontSize="11.5" />
+                                        <TextBlock Text="Green" FontSize="11.5" Foreground="#4ADE80" />
+                                    </DockPanel>
+                                    <Slider Minimum="0" Maximum="255" IsSnapToTickEnabled="True" TickFrequency="1"
+                                            Value="{Binding BgGreen}" Margin="0,0,0,6" />
+
+                                    <DockPanel Margin="0,0,0,2">
+                                        <TextBlock DockPanel.Dock="Right" Text="{Binding BgBlue}" FontSize="11.5" />
+                                        <TextBlock Text="Blue" FontSize="11.5" Foreground="#60A5FA" />
+                                    </DockPanel>
+                                    <Slider Minimum="0" Maximum="255" IsSnapToTickEnabled="True" TickFrequency="1"
+                                            Value="{Binding BgBlue}" Margin="0,0,0,10" />
+
+                                    <DockPanel>
+                                        <TextBlock Text="Hex:" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                        <ui:TextBox Text="{Binding BackgroundColorHex, UpdateSourceTrigger=PropertyChanged}" FontSize="12" />
+                                    </DockPanel>
+                                </StackPanel>
+                            </Border>
+                        </Popup>
+                    </WrapPanel>
                 </StackPanel>
             </Border>
 
-            <!-- Card 2: Zoom, Pan & Focal Point -->
-            <Border Grid.Column="1" Style="{StaticResource DuoCardStyle}" Margin="5,0,5,0">
+            <!-- Card 2: Flip, Zoom, Pan & Focal Point -->
+            <Border Grid.Column="1" Style="{StaticResource DuoCardStyle}" Padding="14" Margin="5,0,5,0">
                 <StackPanel>
-                    <TextBlock Text="ZOOM, PAN &amp; FOCAL POINT" FontSize="11" FontWeight="SemiBold"
+                    <TextBlock Text="TRANSFORM, ZOOM &amp; PAN" FontSize="11" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,8" />
+
+                    <!-- Flip Horizontal & Flip Vertical Buttons -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <ToggleButton Grid.Column="0"
+                                      Style="{StaticResource PillToggleStyle}"
+                                      IsChecked="{Binding FlipHorizontal, Mode=TwoWay}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="FlipHorizontal24" FontSize="15" Margin="0,0,6,0" />
+                                <TextBlock Text="Flip Horizontal" FontSize="12" />
+                            </StackPanel>
+                        </ToggleButton>
+
+                        <ToggleButton Grid.Column="2"
+                                      Style="{StaticResource PillToggleStyle}"
+                                      IsChecked="{Binding FlipVertical, Mode=TwoWay}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="FlipVertical24" FontSize="15" Margin="0,0,6,0" />
+                                <TextBlock Text="Flip Vertical" FontSize="12" />
+                            </StackPanel>
+                        </ToggleButton>
+                    </Grid>
 
                     <DockPanel Margin="0,0,0,4">
                         <TextBlock DockPanel.Dock="Right" Text="{Binding Zoom, StringFormat='{}{0:0.00}×'}" FontSize="12" FontWeight="SemiBold" />
@@ -180,7 +354,7 @@
             </Border>
 
             <!-- Card 3: Fine Crop & Per-Monitor Individual Picker -->
-            <Border Grid.Column="2" Style="{StaticResource DuoCardStyle}" Margin="10,0,0,0">
+            <Border Grid.Column="2" Style="{StaticResource DuoCardStyle}" Padding="14" Margin="10,0,0,0">
                 <StackPanel>
                     <TextBlock Text="CROP FINE-TUNING &amp; PER-MONITOR" FontSize="11" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,8" />
@@ -225,6 +399,8 @@
                     </Border>
                 </StackPanel>
             </Border>
-        </Grid>
+                </Grid>
+            </StackPanel>
+        </ScrollViewer>
     </Grid>
 </UserControl>

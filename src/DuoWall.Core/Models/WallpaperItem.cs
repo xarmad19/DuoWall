@@ -58,6 +58,40 @@ public sealed class WallpaperItem
     }
 
     public string TagsSummary => Tags.Count > 0 ? string.Join(" · ", Tags.Take(5)) : "Ultrawide";
+
+    public static bool IsVideoPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        string ext = Path.GetExtension(path);
+        return ext.Equals(".mp4", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".webm", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".mov", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".wmv", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".mkv", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Resolves the highest-resolution available preview source.
+    /// Avoids letting a cached low-res thumbnail (e.g. 400px grid cache) shadow a high-res PreviewUrl (1700px+).
+    /// </summary>
+    public static string ResolveBestPreviewSource(WallpaperItem model, Func<string, bool>? fileExists = null)
+    {
+        fileExists ??= File.Exists;
+        if (!string.IsNullOrWhiteSpace(model.LocalOriginalPath)
+            && !IsVideoPath(model.LocalOriginalPath)
+            && fileExists(model.LocalOriginalPath))
+        {
+            return model.LocalOriginalPath;
+        }
+
+        if (!string.IsNullOrWhiteSpace(model.PreviewUrl) && !IsVideoPath(model.PreviewUrl))
+            return model.PreviewUrl;
+
+        if (!string.IsNullOrWhiteSpace(model.LocalThumbnailPath) && fileExists(model.LocalThumbnailPath))
+            return model.LocalThumbnailPath;
+
+        return model.ThumbnailUrl ?? string.Empty;
+    }
 }
 
 /// <summary>

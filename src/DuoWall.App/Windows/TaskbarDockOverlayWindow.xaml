@@ -1,0 +1,16 @@
+<Window x:Class="DuoWall.App.Windows.TaskbarDockOverlayWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:controls="clr-namespace:DuoWall.App.Controls"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        ShowActivated="False"
+        Topmost="True">
+    <Grid x:Name="DockRootGrid" Margin="12">
+        <controls:GlassSurfaceControl x:Name="DockGlassSurface" />
+    </Grid>
+</Window>
+

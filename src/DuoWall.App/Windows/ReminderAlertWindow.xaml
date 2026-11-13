@@ -1,0 +1,31 @@
+<Window x:Class="DuoWall.App.Windows.ReminderAlertWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="DuoWall Calendar Reminder"
+        Width="390"
+        SizeToContent="Height"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        Background="Transparent"
+        Topmost="True"
+        ShowInTaskbar="False">
+    <Border CornerRadius="14" Padding="16" Background="#E60F172A" BorderBrush="#6038BDF8" BorderThickness="1.5">
+        <StackPanel>
+            <DockPanel Margin="0,0,0,6">
+                <TextBlock x:Name="KindBadgeText" DockPanel.Dock="Left" Text="REMINDER" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" />
+                <TextBlock x:Name="ModeBadgeText" DockPanel.Dock="Right" Text="Silent Reminder" FontSize="11" Foreground="#FCD34D" />
+            </DockPanel>
+            <TextBlock x:Name="TitleText" FontSize="16" FontWeight="Bold" Foreground="#F8FAFC" TextWrapping="Wrap" Margin="0,0,0,4" />
+            <TextBlock x:Name="MetaText" FontSize="12.5" Foreground="#CBD5E1" TextWrapping="Wrap" Margin="0,0,0,12" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Snooze 5 min" Padding="12,6" Margin="0,0,8,0"
+                        Background="#334155" Foreground="#E2E8F0" BorderThickness="0" Cursor="Hand"
+                        Click="Snooze_Click" />
+                <Button Content="Dismiss" Padding="16,6" FontWeight="SemiBold"
+                        Background="#0284C7" Foreground="White" BorderThickness="0" Cursor="Hand"
+                        Click="Dismiss_Click" />
+            </StackPanel>
+        </StackPanel>
+    </Border>
+</Window>
+

@@ -75,6 +75,78 @@ public sealed class CompositorTests : IDisposable
         Assert.Equal((3840, 1080), (sw, sh));
     }
 
+    [Fact]
+    public async Task RenderMonitorWallpapers_FlipAndPanGapFill_WorkAccurately()
+    {
+        // Quadrant image: TL=Red, TR=Blue, BL=Green, BR=Yellow
+        string srcPath = Path.Combine(_tempDir, "quad.png");
+        using (var bmp = new SKBitmap(3840, 1080))
+        using (var canvas = new SKCanvas(bmp))
+        {
+            canvas.DrawRect(0, 0, 1920, 540, new SKPaint { Color = SKColors.Red });
+            canvas.DrawRect(1920, 0, 1920, 540, new SKPaint { Color = SKColors.Blue });
+            canvas.DrawRect(0, 540, 1920, 540, new SKPaint { Color = SKColors.Lime });
+            canvas.DrawRect(1920, 540, 1920, 540, new SKPaint { Color = SKColors.Yellow });
+            using var img = SKImage.FromBitmap(bmp);
+            using var data = img.Encode(SKEncodedImageFormat.Png, 100);
+            await File.WriteAllBytesAsync(srcPath, data.ToArray());
+        }
+
+        var monitors = new[]
+        {
+            new MonitorInfo { Id = "L", Bounds = new PixelRect(-1920, 0, 1920, 1080), IsConnected = true, IsIncluded = true },
+            new MonitorInfo { Id = "R", Bounds = new PixelRect(0, 0, 1920, 1080), IsPrimary = true, IsConnected = true, IsIncluded = true }
+        };
+
+        var engine = new WallpaperGeometryEngine();
+        var compositor = new SkiaWallpaperCompositor();
+
+        // 1. Test FlipHorizontal + FlipVertical
+        var flippedPlan = engine.ComputePlan(monitors, 3840, 1080, srcPath, new PlacementSettings
+        {
+            Mode = WallpaperPlacementMode.PanoramicSpan,
+            CoordinateSpace = GeometryCoordinateSpace.VirtualPixels,
+            FlipHorizontal = true,
+            FlipVertical = true
+        });
+        var flippedFiles = await compositor.RenderMonitorWallpapersAsync(
+            flippedPlan, Path.Combine(_tempDir, "flipped"), "#000000", OutputImageFormat.PngLossless);
+
+        using (var leftBmp = SKBitmap.Decode(flippedFiles["L"]))
+        using (var rightBmp = SKBitmap.Decode(flippedFiles["R"]))
+        {
+            // TL of Left was BR (Yellow: R>240, G>240, B<15)
+            var lTop = leftBmp.GetPixel(100, 100);
+            Assert.True(lTop.Red > 240 && lTop.Green > 240 && lTop.Blue < 15);
+            // TL of Right was BL (Lime: R<15, G>240, B<15)
+            var rTop = rightBmp.GetPixel(100, 100);
+            Assert.True(rTop.Red < 15 && rTop.Green > 240 && rTop.Blue < 15);
+        }
+
+        // 2. Test Pan leaving a gap filled with selected plain background color #33CC66
+        var gapPlan = engine.ComputePlan(monitors, 3840, 1080, srcPath, new PlacementSettings
+        {
+            Mode = WallpaperPlacementMode.PanoramicSpan,
+            CoordinateSpace = GeometryCoordinateSpace.VirtualPixels,
+            PanX = 0.25, // shifts 960px right -> pixels 0..960 of Left monitor are uncovered gap
+            BackgroundColorHex = "#33CC66"
+        });
+        var gapFiles = await compositor.RenderMonitorWallpapersAsync(
+            gapPlan, Path.Combine(_tempDir, "gap"), "#33CC66", OutputImageFormat.PngLossless);
+
+        using (var gapLeftBmp = SKBitmap.Decode(gapFiles["L"]))
+        {
+            var gapPx = gapLeftBmp.GetPixel(100, 200);
+            Assert.Equal(0x33, gapPx.Red);
+            Assert.Equal(0xCC, gapPx.Green);
+            Assert.Equal(0x66, gapPx.Blue);
+
+            // Wallpaper starts at X=960 -> pixel at X=1200 is Red (from TL)
+            var wpPx = gapLeftBmp.GetPixel(1200, 200);
+            Assert.True(wpPx.Red > 240 && wpPx.Green < 15 && wpPx.Blue < 15);
+        }
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_tempDir, recursive: true); } catch { }

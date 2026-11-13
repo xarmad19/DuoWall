@@ -1,63 +1,111 @@
-# DuoWall by SRMD
+# DuoWall by SRMD (v2.0.0)
 
-**Smart Multi-Monitor Panoramic Wallpaper Manager for Windows 10 & Windows 11**
+**Ultimate Multi-Monitor Panoramic Wallpaper Manager, Glassmorphism Widget Suite & Windows Taskbar Dock**
 
-DuoWall by SRMD is a native .NET 8 WPF desktop application built to replace legacy multi-monitor wallpaper tools like MultiWall. It accurately detects connected displays, accounts for differences in resolution, physical panel dimensions, bezel spacing, DPI scaling, orientation, and negative virtual desktop coordinates, and applies pixel-accurate per-monitor wallpapers using the Windows `IDesktopWallpaper` COM interface.
-
----
-
-## Key Features
-
-### 1. Intelligent Multi-Monitor Wallpaper Engine
-- **Hardware Display Detection**: Uses Win32 `EnumDisplayMonitors`, `EnumDisplaySettingsEx`, `QueryDisplayConfig`, `GetDpiForMonitor` (Per-Monitor V2 DPI aware), and hardware EDID registry descriptors (`HKLM\SYSTEM\CurrentControlSet\Enum\DISPLAY`) for millimeter-accurate physical dimensions.
-- **Dual Coordinate Geometry Modes**:
-  - **Physical Dimensions Mode (`PhysicalDimensions`)**: Maps wallpapers using real-world physical panel sizes (e.g., aligning a 24" 527×296 mm monitor next to a 27" 597×336 mm monitor) with bezel-gap compensation and desk alignment (`AlignBottom`, `AlignCenter`, `AlignTop`, or custom mm offset).
-  - **Virtual Pixel Mode (`VirtualPixels`)**: Maps wallpapers directly onto Windows virtual pixel bounds (handling mixed resolutions like `1920×1080` + `2560×1440`, negative coordinates, portrait orientations, and vertical/horizontal offsets).
-- **Placement Modes**: `Panoramic / Span`, `Fill`, `Fit`, `Stretch`, `Center`, and `Individual` (separate wallpaper per display).
-- **Non-Destructive High-Quality Composition**: Renders dedicated per-monitor output files (PNG lossless or 96% JPEG) via `SkiaSharp` directly from full-resolution originals without ever overwriting downloaded source files.
-- **Native Per-Monitor Application**: Applies each monitor's slice individually through `IDesktopWallpaper` (`CLSID C2CF3110-460E-4FC1-B9D0-8A1C0C9CC4BD`) and backs up the previous Windows desktop wallpaper state for one-click restoration.
-
-### 2. Smart Interactive Preview (`MultiMonitorPreviewControl`)
-- Renders every connected monitor proportionally to its true virtual or physical geometry.
-- Drag directly inside the preview to pan horizontally/vertically, scroll mouse wheel to zoom (`0.25×`–`4.0×`), double-click to reset, and toggle monitor boundary & resolution badges.
-- Displays resolution adequacy advisories when a source image is smaller than required for the combined desktop.
-
-### 3. Integrated Wallpaper Gallery (`UltraWideWallpapers.net`)
-- Browse 6,200+ wallpapers via UltraWideWallpapers.net's public gallery index, `gallery_load.php`, category/resolution pages, and detail pages.
-- Filter by resolution/aspect (`32:9`, `21:9`, `16:9`, `4K`, `5K`, `8K`, `Dual Monitor`), themes (`Nature`, `Abstract`, `Space`, `Architecture`, `Technology`, `OLED`, `Dark`, `Cyberpunk`, `Fantasy`, `Steampunk`, `Animals`, `Vehicles`, `Retro`, `Surreal`, `Pixel Art`), `Favorites`, and sort by `Recent`, `Popular`, `Oldest`, or `Shuffle`.
-- Respects website access restrictions cleanly: Club/Member-only (`vault-*`) or gated items clearly notify the user and open the official source webpage to sign in and complete authorized downloads.
-
-### 4. Local Library, Automation & Settings
-- SQLite-backed local wallpaper library (`%LOCALAPPDATA%\DuoWallBySRMD\duowall.db`) tracking favorites, recently used wallpapers, downloaded file metadata, monitor calibrations, and per-topology placement profiles.
-- Supports importing local images (`JPG`, `PNG`, `WebP`, `BMP`).
-- Optional Windows startup re-application (`HKCU\Software\Microsoft\Windows\CurrentVersion\Run`) and debounced `DisplaySettingsChanged` recovery when monitors connect, disconnect, or change resolution.
-- Fluent Windows 11-inspired Dark (default) and Light themes.
+Developed by **Syed Sarmad Iftikhar**  
+*Feedback & Feature Requests:* [engr.sarmad.iftikhar@gmail.com](mailto:engr.sarmad.iftikhar@gmail.com)  
+*GitHub Repository:* [https://github.com/xarmad19/DuoWall](https://github.com/xarmad19/DuoWall)
 
 ---
 
-## Project Structure
+## 📸 Visual Showcase
 
-- `DuoWall.sln`
-- `src/DuoWall.Core/` — Platform-agnostic multi-monitor geometry engine (`WallpaperGeometryEngine`), SkiaSharp compositor (`SkiaWallpaperCompositor`), UltraWideWallpapers.net provider (`UltraWideWallpapersProvider`), SQLite persistence (`DuoWallDatabase`), and library services.
-- `src/DuoWall.App/` — .NET 8 WPF Fluent desktop application (`Win32DisplayDetector`, `DesktopWallpaperApplier`, `StartupAndWatcherService`, `MultiMonitorPreviewControl`, `MainViewModel`, and Views).
-- `tests/DuoWall.Tests/` — xUnit test suite covering multi-monitor geometry, negative coordinates, mixed resolutions, physical dimensions + bezels, Skia cross-monitor seam alignment, and gallery HTML parsing.
+| Wallpaper Gallery | Placement Studio (Transform Handles) |
+| :---: | :---: |
+| ![Wallpaper Gallery](docs/screenshots/01_wallpaper_gallery.png) | ![Placement Studio](docs/screenshots/02_placement_studio.png) |
+
+| Widget Marketplace & Glass Suite | Taskbar Tweaks (Center Glass Dock) |
+| :---: | :---: |
+| ![Widget Marketplace](docs/screenshots/03_widget_marketplace.png) | ![Taskbar Tweaks](docs/screenshots/04_taskbar_tweaks.png) |
+
+| About Me & Developer Info |
+| :---: |
+| ![About Me Dialog](docs/screenshots/05_about_me_dialog.png) |
 
 ---
 
-## Installation & Usage
+## 🚀 What's New in Version 2.0.0
 
-### Standalone Portable Executable (No .NET Runtime Required)
-1. Locate the standalone Release output in `publish/DuoWall-Portable/DuoWall.exe` (or extract `publish/DuoWall-v1.0.0-win-x64-Portable.zip`).
-2. Run `DuoWall.exe` directly on Windows 10 (19045+) or Windows 11 (x64), OR run `Install-DuoWall.ps1` to install into `%LOCALAPPDATA%\Programs\DuoWall` with Start Menu and Desktop shortcuts.
-3. **Quick Start**:
-   - Open **Monitor Setup** to verify your detected monitors, physical dimensions, and desk vertical alignment (`Align Desk Bottoms` / `Centers` / `Tops`).
-   - Open **Wallpaper Gallery** to search and filter wallpapers from `UltraWideWallpapers.net` (or click **Import Local Image** in **My Wallpapers**).
-   - Click any wallpaper to preview it across your actual monitor geometry, then click **Apply to Monitors** or **Adjust in Studio** to fine-tune pan, zoom, focal point, and crops.
-   - Use **Settings** to configure your download directory, PNG/JPEG output quality, startup auto-apply, display change auto-recovery, or **Restore Previous Windows Wallpaper**.
+- **Placement Studio Direct Transforms**:
+  - Direct canvas interactive transform with 8 bounding box resize handles (`NW`, `N`, `NE`, `E`, `SE`, `S`, `SW`, `W`).
+  - Anchored opposite-edge resizing, click-and-drag panning, and mouse-wheel zooming.
+  - Auto-applies live wallpaper framing to the Windows desktop on mouse release.
+  - Multi-widget selection via single click, `Ctrl/Shift+Click`, or marquee rubber-band box drag.
+  - Group drag-and-move for multiple selected widgets with relative spacing and snap-to-grid.
+  - Resizable monitor preview viewport with full multi-monitor aspect ratio preservation.
+  - Complete workspace profile backup and import/export.
 
-### Building & Testing from Source
+- **Taskbar Tweaks & Center Glass Dock**:
+  - Automatically detects running taskbar application buttons via UIAutomation & MSAA accessibility.
+  - Centers a sleek, translucent glass dock pill directly behind active buttons on Windows 10 & 11.
+  - Dynamic dock width and height sliders.
+  - Smooth auto-hide tracking synchronized with Windows taskbar animations.
+  - Multi-display taskbar visibility controls (all displays or chosen display).
+
+- **Widget Marketplace & Glass Desktop Widgets**:
+  - Renamed tab to **Widget Marketplace** with direct "Edit" button for active widgets.
+  - Universal Accent Color picker with **"Auto Accent from Wallpaper"** smart color extraction.
+  - Enhanced **Full-Month Calendar Widget**: Monday week start, prominent smooth translucent today indicator, weekend/holiday highlights, month navigation arrows, and click-to-schedule interactive Events, Reminders & Notes dialog with audio alarms.
+  - **App, Folder & Web Shortcuts Dock Bar**: smart glass icon or initials mode, custom icon image upload (with clean borderless icon display), scale slider (`0.45×` - `2.50×`), hover tooltips, and **Windows Installed Apps Picker** (Store/UWP, Start Menu, Registry App Paths).
+  - **Typographic Clock**: Per-element font selector with live previews, visibility toggles, custom accent colors, individual and master scaling, and drop-shadow control.
+  - Customizable **Focus Timer** and minimal animated **Weather Widget**.
+
+- **Wallpaper Gallery Upgrades**:
+  - **Upload Custom Photos** with dual-monitor aspect-ratio and resolution warnings.
+  - **Custom Ultra-Wide Website Linking** to scrape and stream wallpapers from any ultra-wide wallpaper website.
+
+- **Top Navigation Menu**:
+  - **About Me**: Top title bar button displaying developer information and feedback channel:
+    > *"This software is developed by Syed Sarmad Iftikhar. You can give your feedback and request new features at engr.sarmad.iftikhar@gmail.com"*
+  - **Check for Updates**: Direct GitHub Release query notifying users of newer versions without background silent downloads.
+
+- **Release Packaging**:
+  - Windows Setup Installer: `DuoWall-v2.0.0-Setup.exe` (Inno Setup 6).
+  - Standalone Portable Zip: `DuoWall-v2.0.0-win-x64-Portable.zip`.
+  - Cryptographic checksums in `publish/SHA256SUMS.txt`.
+
+---
+
+## 🛠️ System Requirements
+
+- **Operating System**: Windows 10 (Build 19045 or later) or Windows 11 (64-bit).
+- **Monitors**: Dual, Triple, or Ultra-Wide multi-monitor setups (also supports single-screen displays).
+- **Hardware Acceleration**: DirectX 11 / Direct3D compatible GPU recommended for SkiaSharp compositor and DWM glass effects.
+
+---
+
+## 📦 Installation & Download
+
+### Option 1: Setup Installer (Recommended)
+1. Download **`DuoWall-v2.0.0-Setup.exe`** from [GitHub Releases](https://github.com/xarmad19/DuoWall/releases).
+2. Run the installer and choose whether to create desktop or startup shortcuts.
+
+### Option 2: Portable Distribution (Zero Installation)
+1. Download **`DuoWall-v2.0.0-win-x64-Portable.zip`**.
+2. Extract to any directory and launch `DuoWall.exe`.
+
+---
+
+## 💻 Building from Source
+
 ```powershell
-dotnet test DuoWall.sln --configuration Release
-dotnet build DuoWall.sln --configuration Release
-dotnet publish src/DuoWall.App/DuoWall.App.csproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+# Clone the repository
+git clone https://github.com/xarmad19/DuoWall.git
+cd DuoWall
+
+# Run test suite
+dotnet test DuoWall.sln -c Release
+
+# Build Release binaries
+dotnet build DuoWall.sln -c Release
+
+# Package portable release and compile Inno Setup installer
+powershell -ExecutionPolicy Bypass -File .\scripts\Build-Release.ps1 -Version "2.0.0"
 ```
+
+---
+
+## 📄 License & Credits
+
+- Developed by **Syed Sarmad Iftikhar** ([engr.sarmad.iftikhar@gmail.com](mailto:engr.sarmad.iftikhar@gmail.com)).
+- Licensed under the [MIT License](LICENSE).

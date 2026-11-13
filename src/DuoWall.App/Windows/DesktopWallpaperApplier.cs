@@ -44,6 +44,62 @@ public sealed class DesktopWallpaperApplier
         });
     }
 
+    /// <summary>
+    /// Resolves the live Windows wallpaper file path currently displayed on each detected MonitorInfo.
+    /// </summary>
+    public Dictionary<string, string> GetActiveWallpaperPaths(IReadOnlyList<MonitorInfo> monitors)
+    {
+        return RunSta(() =>
+        {
+            var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var com = CreateDesktopWallpaper();
+            try
+            {
+                com.GetMonitorDevicePathCount(out uint count);
+                var comList = new List<(string ComId, PixelRect? Rect, string Path)>();
+                for (uint i = 0; i < count; i++)
+                {
+                    try
+                    {
+                        com.GetMonitorDevicePathAt(i, out string id);
+                        if (string.IsNullOrWhiteSpace(id)) continue;
+                        com.GetWallpaper(id, out string wp);
+                        PixelRect? rect = null;
+                        try
+                        {
+                            com.GetMonitorRECT(id, out var rc);
+                            rect = new PixelRect(rc.left, rc.top, rc.right - rc.left, rc.bottom - rc.top);
+                        }
+                        catch { }
+                        comList.Add((id, rect, wp ?? string.Empty));
+                    }
+                    catch { }
+                }
+
+                var matchCandidates = comList.Select(x => (x.ComId, x.Rect)).ToList();
+                foreach (var mon in monitors)
+                {
+                    string? matched = MatchComMonitorId(mon, matchCandidates);
+                    if (!string.IsNullOrWhiteSpace(matched))
+                    {
+                        var found = comList.FirstOrDefault(x => string.Equals(x.ComId, matched, StringComparison.OrdinalIgnoreCase));
+                        if (!string.IsNullOrWhiteSpace(found.Path) && File.Exists(found.Path))
+                        {
+                            result[mon.Id] = found.Path;
+                        }
+                    }
+                }
+            }
+            catch { }
+            finally
+            {
+                Marshal.ReleaseComObject(com);
+            }
+
+            return result;
+        });
+    }
+
     public void ApplyMonitorWallpapers(
         IReadOnlyList<MonitorInfo> monitors,
         IReadOnlyDictionary<string, string> generatedPathsByMonitorId,

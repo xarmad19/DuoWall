@@ -110,6 +110,46 @@
                 </StackPanel>
             </Border>
 
+            <!-- V2.0 Desktop Widgets, Weather & GitHub Updates -->
+            <Border Style="{StaticResource DuoCardStyle}" Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="DESKTOP WIDGETS &amp; WEATHER SERVICE" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,12" />
+
+                    <DockPanel Margin="0,0,0,14">
+                        <ui:ToggleSwitch DockPanel.Dock="Right" IsChecked="{Binding EnableDesktopWidgets}" />
+                        <StackPanel>
+                            <TextBlock Text="Enable Desktop Widget Overlays" FontSize="14" FontWeight="SemiBold" />
+                            <TextBlock Text="Displays active profile Glassmorphism widgets on your multi-monitor desktop" FontSize="12"
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Grid.Column="0">
+                            <TextBlock Text="Weather City / Location (Keyless Open-Meteo by default)" FontSize="12" Margin="0,0,0,4" />
+                            <ui:TextBox Text="{Binding WeatherCity, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="e.g. Lahore, London, New York" />
+                        </StackPanel>
+                        <CheckBox Grid.Column="2" Content="Fahrenheit (°F)" IsChecked="{Binding WeatherUseFahrenheit}" VerticalAlignment="Bottom" Margin="0,0,0,6" />
+                        <ui:Button Grid.Column="4" Appearance="Secondary" Command="{Binding SyncWeatherNowCommand}" VerticalAlignment="Bottom">
+                            <TextBlock Text="Sync Weather" />
+                        </ui:Button>
+                    </Grid>
+
+                    <TextBlock Text="Optional Custom Weather Provider API Key (OpenWeatherMap — leave blank to use free keyless Open-Meteo)"
+                               FontSize="12" Margin="0,0,0,4" />
+                    <ui:TextBox Text="{Binding CustomWeatherApiKey, UpdateSourceTrigger=PropertyChanged}"
+                                PlaceholderText="Optional OpenWeatherMap API key (stored locally)..." />
+                </StackPanel>
+            </Border>
+
             <!-- Restore Defaults & About -->
             <Border Style="{StaticResource DuoCardStyle}">
                 <StackPanel>
@@ -129,13 +169,22 @@
                         </StackPanel>
                     </DockPanel>
 
+                    <TextBlock Text="Official GitHub Releases Repository (Safe update check — verifies SHA256SUMS.txt, never auto-executes binaries)"
+                               FontSize="12" Margin="0,0,0,4" />
+                    <ui:TextBox Text="{Binding GitHubRepositorySlug, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,12" />
+
                     <DockPanel>
-                        <ui:Button DockPanel.Dock="Right" Appearance="Secondary" Command="{Binding CheckForUpdatesCommand}">
-                            <TextBlock Text="Check Updates" />
-                        </ui:Button>
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <ui:Button Appearance="Secondary" Command="{Binding OpenReleasePageCommand}" Margin="0,0,8,0">
+                                <TextBlock Text="Open Releases Page" />
+                            </ui:Button>
+                            <ui:Button Appearance="Primary" Command="{Binding CheckForUpdatesCommand}">
+                                <TextBlock Text="Check Updates" />
+                            </ui:Button>
+                        </StackPanel>
                         <StackPanel>
-                            <TextBlock Text="DuoWall by SRMD · Version 1.0.0" FontSize="14" FontWeight="SemiBold" />
-                            <TextBlock Text="Native .NET 8 WPF multi-monitor wallpaper compositor · Gallery powered by UltraWideWallpapers.net"
+                            <TextBlock Text="DuoWall by SRMD · Version 2.0.0" FontSize="14" FontWeight="SemiBold" />
+                            <TextBlock Text="Native .NET 8 WPF multi-monitor wallpaper compositor, Glassmorphism Widget Studio &amp; Adaptive Profiles"
                                        FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
                     </DockPanel>

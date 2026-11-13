@@ -2,6 +2,18 @@ using DuoWall.Core.Models;
 
 namespace DuoWall.Core.Engine;
 
+public enum WallpaperResizeAnchor
+{
+    TopLeft,
+    Top,
+    TopRight,
+    Right,
+    BottomRight,
+    Bottom,
+    BottomLeft,
+    Left
+}
+
 /// <summary>
 /// Pure, deterministic multi-monitor geometry and projection engine.
 /// Computes exact per-monitor source cropping and destination rectangles
@@ -99,7 +111,9 @@ public sealed class WallpaperGeometryEngine
                     CanvasRect = canvasRects[mon.Id],
                     DestinationPixelRect = dstRect,
                     SourcePixelRect = srcRect,
-                    SourceImagePath = imgPath
+                    SourceImagePath = imgPath,
+                    FlipHorizontal = hasAssign ? assign!.FlipHorizontal : settings.FlipHorizontal,
+                    FlipVertical = hasAssign ? assign!.FlipVertical : settings.FlipVertical
                 });
             }
 
@@ -111,6 +125,8 @@ public sealed class WallpaperGeometryEngine
                 CombinedCanvasHeight = combinedHeight,
                 CoordinateSpace = settings.CoordinateSpace,
                 Mode = settings.Mode,
+                FlipHorizontal = settings.FlipHorizontal,
+                FlipVertical = settings.FlipVertical,
                 VirtualDesktopWidth = virtWidth,
                 VirtualDesktopHeight = virtHeight,
                 ImageCanvasRect = new RectD(0, 0, combinedWidth, combinedHeight),
@@ -168,7 +184,9 @@ public sealed class WallpaperGeometryEngine
                 CanvasRect = monCanvasRect,
                 DestinationPixelRect = dstRect,
                 SourcePixelRect = srcRect,
-                SourceImagePath = sourceImagePath
+                SourceImagePath = sourceImagePath,
+                FlipHorizontal = settings.FlipHorizontal,
+                FlipVertical = settings.FlipVertical
             });
         }
 
@@ -180,6 +198,8 @@ public sealed class WallpaperGeometryEngine
             CombinedCanvasHeight = combinedHeight,
             CoordinateSpace = settings.CoordinateSpace,
             Mode = settings.Mode,
+            FlipHorizontal = settings.FlipHorizontal,
+            FlipVertical = settings.FlipVertical,
             VirtualDesktopWidth = virtWidth,
             VirtualDesktopHeight = virtHeight,
             ImageCanvasRect = imageCanvasRect,
@@ -427,6 +447,84 @@ public sealed class WallpaperGeometryEngine
         double y = fy * (canvasH - imgH) + panY * canvasH;
 
         return new RectD(x, y, imgW, imgH);
+    }
+
+    /// <summary>
+    /// Computes updated (Zoom, PanX, PanY) when dragging a corner or edge resize handle
+    /// of the projected wallpaper rectangle, anchoring the opposite corner/edge in place.
+    /// </summary>
+    public static (double Zoom, double PanX, double PanY) ComputeResizedTransform(
+        RectD startImageRect,
+        double combinedCanvasWidth,
+        double combinedCanvasHeight,
+        double startZoom,
+        double focalX,
+        double focalY,
+        double deltaCanvasX,
+        double deltaCanvasY,
+        WallpaperResizeAnchor handle)
+    {
+        double cw = Math.Max(1.0, combinedCanvasWidth);
+        double ch = Math.Max(1.0, combinedCanvasHeight);
+        double w0 = Math.Max(1.0, startImageRect.Width);
+        double h0 = Math.Max(1.0, startImageRect.Height);
+        double z0 = Math.Clamp(startZoom, 0.25, 4.0);
+
+        double signedDx = handle switch
+        {
+            WallpaperResizeAnchor.TopLeft or WallpaperResizeAnchor.Left or WallpaperResizeAnchor.BottomLeft => -deltaCanvasX,
+            WallpaperResizeAnchor.TopRight or WallpaperResizeAnchor.Right or WallpaperResizeAnchor.BottomRight => deltaCanvasX,
+            _ => 0.0
+        };
+        double signedDy = handle switch
+        {
+            WallpaperResizeAnchor.TopLeft or WallpaperResizeAnchor.Top or WallpaperResizeAnchor.TopRight => -deltaCanvasY,
+            WallpaperResizeAnchor.BottomLeft or WallpaperResizeAnchor.Bottom or WallpaperResizeAnchor.BottomRight => deltaCanvasY,
+            _ => 0.0
+        };
+
+        double scaleW = (w0 + signedDx) / w0;
+        double scaleH = (h0 + signedDy) / h0;
+
+        double requestedRatio = handle switch
+        {
+            WallpaperResizeAnchor.Left or WallpaperResizeAnchor.Right => scaleW,
+            WallpaperResizeAnchor.Top or WallpaperResizeAnchor.Bottom => scaleH,
+            _ => (scaleW + scaleH) * 0.5
+        };
+
+        if (double.IsNaN(requestedRatio) || double.IsInfinity(requestedRatio))
+            requestedRatio = 1.0;
+
+        double newZoom = Math.Clamp(z0 * Math.Max(0.10, requestedRatio), 0.25, 4.0);
+        double actualScale = newZoom / z0;
+
+        double ax = handle switch
+        {
+            WallpaperResizeAnchor.TopLeft or WallpaperResizeAnchor.Left or WallpaperResizeAnchor.BottomLeft => 1.0,
+            WallpaperResizeAnchor.Top or WallpaperResizeAnchor.Bottom => 0.5,
+            _ => 0.0
+        };
+        double ay = handle switch
+        {
+            WallpaperResizeAnchor.TopLeft or WallpaperResizeAnchor.Top or WallpaperResizeAnchor.TopRight => 1.0,
+            WallpaperResizeAnchor.Left or WallpaperResizeAnchor.Right => 0.5,
+            _ => 0.0
+        };
+
+        double newW = w0 * actualScale;
+        double newH = h0 * actualScale;
+        double anchorX = startImageRect.X + ax * w0;
+        double anchorY = startImageRect.Y + ay * h0;
+        double newX = anchorX - ax * newW;
+        double newY = anchorY - ay * newH;
+
+        double fx = Math.Clamp(focalX, 0.0, 1.0);
+        double fy = Math.Clamp(focalY, 0.0, 1.0);
+        double newPanX = Math.Clamp((newX - fx * (cw - newW)) / cw, -1.5, 1.5);
+        double newPanY = Math.Clamp((newY - fy * (ch - newH)) / ch, -1.5, 1.5);
+
+        return (Math.Round(newZoom, 4), Math.Round(newPanX, 4), Math.Round(newPanY, 4));
     }
 
     private static (RectD DestinationPixelRect, RectD SourcePixelRect) ComputeMonitorIntersection(

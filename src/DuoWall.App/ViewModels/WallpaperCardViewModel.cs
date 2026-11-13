@@ -16,6 +16,7 @@ public sealed partial class WallpaperCardViewModel : ObservableObject
     [ObservableProperty] private bool _isDownloaded;
     [ObservableProperty] private bool _isDownloading;
     [ObservableProperty] private double _downloadProgress;
+    private string _loadedPreviewSource = string.Empty;
 
     public string Id => Model.Id;
     public string FileName => Model.FileName;
@@ -31,10 +32,18 @@ public sealed partial class WallpaperCardViewModel : ObservableObject
     public string? AccessRestrictionReason => Model.AccessRestrictionReason;
     public IReadOnlyList<string> Tags => Model.Tags;
 
-    public string BestPreviewSource =>
-        Model.IsDownloaded && !string.IsNullOrWhiteSpace(Model.LocalOriginalPath)
-            ? Model.LocalOriginalPath
-            : (!string.IsNullOrWhiteSpace(Model.PreviewUrl) ? Model.PreviewUrl : Model.ThumbnailUrl);
+    public static bool IsVideoFile(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return false;
+        string ext = System.IO.Path.GetExtension(path);
+        return ext.Equals(".mp4", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".webm", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".mov", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".wmv", StringComparison.OrdinalIgnoreCase)
+            || ext.Equals(".mkv", StringComparison.OrdinalIgnoreCase);
+    }
+
+    public string BestPreviewSource => WallpaperItem.ResolveBestPreviewSource(Model);
 
     public WallpaperCardViewModel(WallpaperItem model)
     {
@@ -61,7 +70,7 @@ public sealed partial class WallpaperCardViewModel : ObservableObject
     {
         if (ThumbnailBitmap != null) return;
 
-        if (!string.IsNullOrWhiteSpace(Model.LocalOriginalPath) && System.IO.File.Exists(Model.LocalOriginalPath))
+        if (!string.IsNullOrWhiteSpace(Model.LocalOriginalPath) && System.IO.File.Exists(Model.LocalOriginalPath) && !IsVideoFile(Model.LocalOriginalPath))
         {
             ThumbnailBitmap = await ImageCacheHelper.LoadBitmapAsync(Model.LocalOriginalPath, decodePixelWidth: 460, cancellationToken: ct);
             return;
@@ -70,6 +79,12 @@ public sealed partial class WallpaperCardViewModel : ObservableObject
         if (!string.IsNullOrWhiteSpace(Model.LocalThumbnailPath) && System.IO.File.Exists(Model.LocalThumbnailPath))
         {
             ThumbnailBitmap = await ImageCacheHelper.LoadBitmapAsync(Model.LocalThumbnailPath, decodePixelWidth: 460, cancellationToken: ct);
+            if (ThumbnailBitmap != null) return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(Model.PreviewUrl) && System.IO.File.Exists(Model.PreviewUrl) && !IsVideoFile(Model.PreviewUrl))
+        {
+            ThumbnailBitmap = await ImageCacheHelper.LoadBitmapAsync(Model.PreviewUrl, decodePixelWidth: 460, cancellationToken: ct);
             if (ThumbnailBitmap != null) return;
         }
 
@@ -82,15 +97,21 @@ public sealed partial class WallpaperCardViewModel : ObservableObject
 
     public async Task EnsurePreviewLoadedAsync(string cacheDir, CancellationToken ct = default)
     {
-        if (PreviewBitmap != null) return;
         string src = BestPreviewSource;
         if (string.IsNullOrWhiteSpace(src)) return;
+        if (PreviewBitmap != null && string.Equals(_loadedPreviewSource, src, StringComparison.OrdinalIgnoreCase))
+            return;
 
-        PreviewBitmap = await ImageCacheHelper.LoadBitmapAsync(
+        var loaded = await ImageCacheHelper.LoadBitmapAsync(
             src,
-            decodePixelWidth: 1800,
+            decodePixelWidth: 2600,
             referrer: Model.SourcePageUrl,
             diskCacheDirectory: cacheDir,
             cancellationToken: ct);
+        if (loaded != null)
+        {
+            _loadedPreviewSource = src;
+            PreviewBitmap = loaded;
+        }
     }
 }

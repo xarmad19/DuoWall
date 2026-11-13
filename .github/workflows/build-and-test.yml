@@ -1,0 +1,63 @@
+name: Build, Test and Package DuoWall
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8 SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore dependencies
+        run: dotnet restore DuoWall.sln
+
+      - name: Build Release
+        run: dotnet build DuoWall.sln --configuration Release --no-restore
+
+      - name: Run Unit & Integration Tests
+        run: dotnet test DuoWall.sln --configuration Release --no-build --verbosity normal
+
+      - name: Publish Portable Release (win-x64)
+        run: |
+          dotnet publish src/DuoWall.App/DuoWall.App.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=true `
+            -p:IncludeNativeLibrariesForSelfExtract=true `
+            -p:EnableCompressionInSingleFile=true `
+            -o publish/DuoWall-Portable
+
+      - name: Package ZIP & Generate SHA-256 Checksums
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path publish/stage | Out-Null
+          Copy-Item publish/DuoWall-Portable/DuoWall.exe publish/stage/DuoWall.exe
+          Copy-Item README.md publish/stage/README.md
+          Copy-Item LICENSE publish/stage/LICENSE
+          Compress-Archive -Path publish/stage/* -DestinationPath publish/DuoWall-win-x64-Portable.zip -Force
+          Remove-Item -Recurse -Force publish/stage
+          Get-FileHash publish/DuoWall-Portable/DuoWall.exe, publish/DuoWall-win-x64-Portable.zip -Algorithm SHA256 |
+            ForEach-Object { "$($_.Hash.ToLowerInvariant())  $(Split-Path $_.Path -Leaf)" } |
+            Out-File -Encoding ascii publish/SHA256SUMS.txt
+          Get-Content publish/SHA256SUMS.txt
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: DuoWall-win-x64
+          path: |
+            publish/DuoWall-win-x64-Portable.zip
+            publish/SHA256SUMS.txt
+

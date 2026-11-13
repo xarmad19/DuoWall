@@ -1,0 +1,331 @@
+<UserControl x:Class="DuoWall.App.Views.ProfilesView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:controls="clr-namespace:DuoWall.App.Controls">
+    <Grid Margin="22,14,22,18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <DockPanel Grid.Row="0" Margin="0,0,0,14">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <CheckBox Content="Enable Auto-Switching"
+                          IsChecked="{Binding EnableAutomaticSwitching}"
+                          FontWeight="SemiBold"
+                          Margin="0,0,16,0" />
+                <CheckBox Content="Lock Active Profile (Manual Override)"
+                          IsChecked="{Binding LockCurrentProfileManually}"
+                          FontWeight="SemiBold" />
+            </StackPanel>
+
+            <StackPanel>
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="Desktop Profiles &amp; Adaptive Color" FontSize="25" FontWeight="Bold" />
+                    <Border Background="#2610B981" BorderBrush="#6010B981" BorderThickness="1" CornerRadius="8"
+                            Padding="10,3" Margin="12,0,0,0" VerticalAlignment="Center">
+                        <TextBlock Text="{Binding ActiveProfileTitle}" FontSize="12" FontWeight="SemiBold" Foreground="#6EE7B7" />
+                    </Border>
+                </StackPanel>
+                <TextBlock Text="{Binding AutoSwitchStatusText}"
+                           FontSize="12.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0" />
+            </StackPanel>
+        </DockPanel>
+
+        <!-- Body -->
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="310" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Profiles List -->
+            <Border Grid.Column="0" Style="{StaticResource DuoCardStyle}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Grid.Row="0" Text="PRESETS &amp; USER PROFILES" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,10" />
+
+                    <ListBox Grid.Row="1"
+                             ItemsSource="{Binding Profiles}"
+                             SelectedItem="{Binding SelectedProfile}"
+                             Margin="0,0,0,12">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="6,6">
+                                    <StackPanel>
+                                        <DockPanel>
+                                            <TextBlock DockPanel.Dock="Right" Text="{Binding Priority, StringFormat='P{0}'}" FontSize="11"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                            <TextBlock Text="{Binding Name}" FontSize="13.5" FontWeight="SemiBold" />
+                                        </DockPanel>
+                                        <TextBlock Text="{Binding Description}" FontSize="11.5" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <StackPanel Grid.Row="2">
+                        <ui:Button Appearance="Primary" Command="{Binding ActivateSelectedProfileCommand}"
+                                   HorizontalAlignment="Stretch" Margin="0,0,0,8">
+                            <TextBlock Text="Activate Selected Profile" />
+                        </ui:Button>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:Button Grid.Column="0" Appearance="Secondary" Command="{Binding CreateCustomProfileCommand}" HorizontalAlignment="Stretch">
+                                <TextBlock Text="+ New Custom" />
+                            </ui:Button>
+                            <ui:Button Grid.Column="2" Appearance="Danger" Command="{Binding DeleteSelectedProfileCommand}">
+                                <ui:SymbolIcon Symbol="Delete24" />
+                            </ui:Button>
+                        </Grid>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- Right Column: Profile Editor + Triggers + Wallpaper-Aware Adaptation -->
+            <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto" Padding="0,0,6,0">
+                <StackPanel>
+                    <!-- Profile Properties -->
+                    <Border Style="{StaticResource DuoCardStyle}" Margin="0,0,0,14">
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,10">
+                                <ui:Button DockPanel.Dock="Right" Appearance="Primary" Command="{Binding SaveSelectedProfileCommand}">
+                                    <TextBlock Text="Save Profile Settings" />
+                                </ui:Button>
+                                <TextBlock Text="PROFILE CONFIGURATION" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
+                            </DockPanel>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="180" />
+                                    <ColumnDefinition Width="12" />
+                                    <ColumnDefinition Width="90" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Profile Name" FontSize="11.5" Margin="0,0,0,4" />
+                                    <ui:TextBox Text="{Binding EditName, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Default Glass Preset" FontSize="11.5" Margin="0,0,0,4" />
+                                    <ComboBox ItemsSource="{Binding GlassPresetNames}" SelectedItem="{Binding EditGlassPresetName}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="4">
+                                    <TextBlock Text="Priority" FontSize="11.5" Margin="0,0,0,4" />
+                                    <ui:TextBox Text="{Binding EditPriority, UpdateSourceTrigger=LostFocus}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <TextBlock Text="Description" FontSize="11.5" Margin="0,0,0,4" />
+                            <ui:TextBox Text="{Binding EditDescription, UpdateSourceTrigger=PropertyChanged}" Margin="0,0,0,10" />
+
+                            <WrapPanel Margin="0,0,0,8">
+                                <CheckBox Content="Participate in Automatic Switching" IsChecked="{Binding EditIsEnabled}" Margin="0,0,18,6" />
+                                <CheckBox Content="Minimal Animations (Power / Focus)" IsChecked="{Binding EditMinimalAnimations}" Margin="0,0,18,6" />
+                            </WrapPanel>
+
+                            <TextBlock Text="{Binding EditBrightness, StringFormat='Profile Widget Brightness: {0:0.00}x'}" FontSize="12" />
+                            <Slider Minimum="0.30" Maximum="1.20" TickFrequency="0.05" Value="{Binding EditBrightness}" />
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Automatic Switching Triggers -->
+                    <Border Style="{StaticResource DuoCardStyle}" Margin="0,0,0,14">
+                        <StackPanel>
+                            <TextBlock Text="INTELLIGENT SWITCHING TRIGGERS" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,10" />
+
+                            <ListBox ItemsSource="{Binding SelectedProfileTriggers}"
+                                     SelectedItem="{Binding SelectedTrigger}"
+                                     MaxHeight="135"
+                                     Margin="0,0,0,10">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel Margin="2">
+                                            <TextBlock DockPanel.Dock="Right" FontSize="11.5"
+                                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}">
+                                                <Run Text="{Binding StartTime}" />
+                                                <Run Text=" → " />
+                                                <Run Text="{Binding EndTime}" />
+                                            </TextBlock>
+                                            <TextBlock FontSize="12.5" FontWeight="SemiBold">
+                                                <Run Text="{Binding TriggerType}" />
+                                                <Run Text="  (" />
+                                                <Run Text="{Binding PowerCondition}" />
+                                                <Run Text=")" />
+                                            </TextBlock>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+
+                            <Grid Margin="0,0,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="95" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="95" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Grid.Column="0">
+                                    <TextBlock Text="Trigger Type" FontSize="11" />
+                                    <ComboBox ItemsSource="{Binding TriggerTypes}" SelectedItem="{Binding NewTriggerType}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="2">
+                                    <TextBlock Text="Start (HH:mm)" FontSize="11" />
+                                    <ui:TextBox Text="{Binding NewTriggerStart, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="4">
+                                    <TextBlock Text="End (HH:mm)" FontSize="11" />
+                                    <ui:TextBox Text="{Binding NewTriggerEnd, UpdateSourceTrigger=PropertyChanged}" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="6">
+                                    <TextBlock Text="Power State" FontSize="11" />
+                                    <ComboBox ItemsSource="{Binding PowerConditions}" SelectedItem="{Binding NewTriggerPower}" />
+                                </StackPanel>
+                            </Grid>
+
+                            <WrapPanel Margin="0,0,0,8">
+                                <CheckBox Content="Mon" IsChecked="{Binding DayMon}" Margin="0,0,10,4" />
+                                <CheckBox Content="Tue" IsChecked="{Binding DayTue}" Margin="0,0,10,4" />
+                                <CheckBox Content="Wed" IsChecked="{Binding DayWed}" Margin="0,0,10,4" />
+                                <CheckBox Content="Thu" IsChecked="{Binding DayThu}" Margin="0,0,10,4" />
+                                <CheckBox Content="Fri" IsChecked="{Binding DayFri}" Margin="0,0,10,4" />
+                                <CheckBox Content="Sat" IsChecked="{Binding DaySat}" Margin="0,0,10,4" />
+                                <CheckBox Content="Sun" IsChecked="{Binding DaySun}" Margin="0,0,10,4" />
+                            </WrapPanel>
+
+                            <DockPanel Margin="0,0,0,10">
+                                <ui:Button DockPanel.Dock="Right" Appearance="Secondary" Command="{Binding UseCurrentMonitorTopologyCommand}" Margin="8,0,0,0">
+                                    <TextBlock Text="Use Current Monitors" />
+                                </ui:Button>
+                                <ui:TextBox Text="{Binding NewTriggerTopologyPattern, UpdateSourceTrigger=PropertyChanged}"
+                                            PlaceholderText="Optional monitor topology signature filter..." />
+                            </DockPanel>
+
+                            <StackPanel Orientation="Horizontal">
+                                <ui:Button Appearance="Primary" Command="{Binding AddTriggerRuleCommand}" Margin="0,0,8,0">
+                                    <TextBlock Text="+ Add Trigger Rule" />
+                                </ui:Button>
+                                <ui:Button Appearance="Danger" Command="{Binding RemoveSelectedTriggerCommand}">
+                                    <TextBlock Text="Remove Selected Rule" />
+                                </ui:Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <!-- Wallpaper-Aware Color Adaptation -->
+                    <Border Style="{StaticResource DuoCardStyle}">
+                        <StackPanel>
+                            <DockPanel Margin="0,0,0,10">
+                                <ComboBox DockPanel.Dock="Right" Width="170" ItemsSource="{Binding AdaptationModes}"
+                                          SelectedItem="{Binding ColorAdaptationMode}" />
+                                <StackPanel>
+                                    <TextBlock Text="WALLPAPER-AWARE WIDGET COLOR ADAPTATION" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                                    <TextBlock Text="Adapts glass tint &amp; WCAG text contrast cleanly without ever moving or resizing widgets"
+                                               FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </DockPanel>
+
+                            <Grid Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="16" />
+                                    <ColumnDefinition Width="260" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Column="0">
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <Border Width="52" Height="36" CornerRadius="8" Background="{Binding PaletteDominantHex}" BorderBrush="#66FFFFFF" BorderThickness="1" Margin="0,0,8,0" ToolTip="Dominant Color" />
+                                        <Border Width="52" Height="36" CornerRadius="8" Background="{Binding PaletteSecondaryHex}" BorderBrush="#66FFFFFF" BorderThickness="1" Margin="0,0,8,0" ToolTip="Secondary Color" />
+                                        <Border Width="52" Height="36" CornerRadius="8" Background="{Binding PaletteAccentHex}" BorderBrush="#66FFFFFF" BorderThickness="1" Margin="0,0,12,0" ToolTip="Accent Color" />
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding PaletteAnalysisSummary}" FontSize="12" FontWeight="SemiBold" />
+                                            <TextBlock Text="{Binding PaletteContrastBadge}" FontSize="11.5" Foreground="#6EE7B7" />
+                                        </StackPanel>
+                                    </StackPanel>
+
+                                    <WrapPanel Margin="0,0,0,10">
+                                        <ui:Button Appearance="Secondary" Command="{Binding AnalyzeCurrentWallpaperNowCommand}" Margin="0,0,8,6">
+                                            <TextBlock Text="Analyze Current Wallpaper" />
+                                        </ui:Button>
+                                        <ui:Button Appearance="Primary" Command="{Binding ApplySuggestedPaletteToWidgetsCommand}" Margin="0,0,8,6">
+                                            <TextBlock Text="Apply Suggested Colors" />
+                                        </ui:Button>
+                                    </WrapPanel>
+
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <ui:TextBox Grid.Column="0" Text="{Binding CustomThemeSaveName, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Custom theme name..." />
+                                        <ui:Button Grid.Column="2" Appearance="Secondary" Command="{Binding SaveCurrentPaletteAsCustomThemeCommand}">
+                                            <TextBlock Text="Save Theme" />
+                                        </ui:Button>
+                                        <ui:Button Grid.Column="4" Appearance="Secondary" Command="{Binding ExportCurrentPalettePackageCommand}">
+                                            <TextBlock Text="Export .dwwp" />
+                                        </ui:Button>
+                                    </Grid>
+                                </StackPanel>
+
+                                <Border Grid.Column="2" Background="#0F172A" CornerRadius="10" Padding="10">
+                                    <controls:GlassSurfaceControl x:Name="SuggestedGlassPreview" Height="96">
+                                        <StackPanel Margin="12" VerticalAlignment="Center">
+                                            <TextBlock x:Name="PreviewTitleText" Text="Adapted Glass Preview" FontSize="13.5" FontWeight="Bold" />
+                                            <TextBlock x:Name="PreviewSubText" Text="Contrast-safe typography &amp; tint" FontSize="11.5" Margin="0,2,0,0" />
+                                        </StackPanel>
+                                    </controls:GlassSurfaceControl>
+                                </Border>
+                            </Grid>
+
+                            <TextBlock Text="SAVED COLOR THEMES" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,6" />
+                            <ItemsControl ItemsSource="{Binding SavedPalettes}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <ui:Button Appearance="Secondary" Margin="0,0,8,6" Padding="10,5"
+                                                   Command="{Binding DataContext.ApplySavedPaletteCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                   CommandParameter="{Binding}">
+                                            <StackPanel Orientation="Horizontal">
+                                                <Ellipse Width="12" Height="12" Fill="{Binding AccentHex}" Margin="0,0,6,0" />
+                                                <TextBlock Text="{Binding Name}" FontSize="12" />
+                                            </StackPanel>
+                                        </ui:Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</UserControl>
+

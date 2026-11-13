@@ -56,6 +56,8 @@ public sealed class PerMonitorAssignment
     public double PanY { get; set; }
     public double FocalX { get; set; } = 0.5;
     public double FocalY { get; set; } = 0.5;
+    public bool FlipHorizontal { get; set; }
+    public bool FlipVertical { get; set; }
 
     public PerMonitorAssignment Clone() => new()
     {
@@ -67,7 +69,9 @@ public sealed class PerMonitorAssignment
         PanX = PanX,
         PanY = PanY,
         FocalX = FocalX,
-        FocalY = FocalY
+        FocalY = FocalY,
+        FlipHorizontal = FlipHorizontal,
+        FlipVertical = FlipVertical
     };
 }
 
@@ -112,12 +116,22 @@ public sealed class PlacementSettings
     public double CropBottom { get; set; }
 
     /// <summary>
+    /// Mirror source image horizontally before slicing.
+    /// </summary>
+    public bool FlipHorizontal { get; set; }
+
+    /// <summary>
+    /// Mirror source image vertically before slicing.
+    /// </summary>
+    public bool FlipVertical { get; set; }
+
+    /// <summary>
     /// When true in PhysicalDimensions mode, accounts for physical bezel spacing between adjacent displays.
     /// </summary>
     public bool EnableBezelCompensation { get; set; } = true;
 
     /// <summary>
-    /// Background color used for uncovered areas in Fit, Center, or zoomed-out modes.
+    /// Background color used for uncovered areas when panning leaves a gap, or in Fit/Center/zoomed-out modes.
     /// </summary>
     public string BackgroundColorHex { get; set; } = "#0D1017";
 
@@ -137,6 +151,8 @@ public sealed class PlacementSettings
         CropTop = 0.0;
         CropRight = 0.0;
         CropBottom = 0.0;
+        FlipHorizontal = false;
+        FlipVertical = false;
     }
 
     public PlacementSettings Clone()
@@ -155,6 +171,8 @@ public sealed class PlacementSettings
             CropTop = CropTop,
             CropRight = CropRight,
             CropBottom = CropBottom,
+            FlipHorizontal = FlipHorizontal,
+            FlipVertical = FlipVertical,
             EnableBezelCompensation = EnableBezelCompensation,
             BackgroundColorHex = BackgroundColorHex,
             PerMonitorAssignments = new Dictionary<string, PerMonitorAssignment>()
@@ -195,6 +213,9 @@ public sealed class MonitorSlicePlan
     /// </summary>
     public string SourceImagePath { get; init; } = string.Empty;
 
+    public bool FlipHorizontal { get; init; }
+    public bool FlipVertical { get; init; }
+
     /// <summary>
     /// Output width in pixels (equals Monitor.PixelWidth).
     /// </summary>
@@ -234,6 +255,8 @@ public sealed class CompositionPlan
     public double CombinedCanvasHeight { get; init; }
     public GeometryCoordinateSpace CoordinateSpace { get; init; }
     public WallpaperPlacementMode Mode { get; init; }
+    public bool FlipHorizontal { get; init; }
+    public bool FlipVertical { get; init; }
 
     /// <summary>
     /// Total virtual pixel bounding width across all included monitors.

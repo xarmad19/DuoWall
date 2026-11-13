@@ -1,0 +1,277 @@
+<UserControl x:Class="DuoWall.App.Views.LiveWallpaperView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml">
+    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="22,14,22,22">
+        <StackPanel>
+            <!-- Header -->
+            <DockPanel Margin="0,0,0,14">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <ui:Button Appearance="Secondary" Command="{Binding ImportLocalVideoCommand}" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="Add24" Margin="0,0,6,0" />
+                            <TextBlock Text="Import Local Video" />
+                        </StackPanel>
+                    </ui:Button>
+                    <ui:Button Appearance="Secondary" Command="{Binding OpenLiveFolderCommand}">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="FolderOpen24" Margin="0,0,6,0" />
+                            <TextBlock Text="Open Videos Folder" />
+                        </StackPanel>
+                    </ui:Button>
+                </StackPanel>
+
+                <StackPanel>
+                    <TextBlock Text="Live Wallpaper" FontSize="26" FontWeight="Bold" />
+                    <TextBlock Text="Search 4K &amp; ultrawide looping videos on YouTube, download locally, and frame across monitors in Placement Studio"
+                               FontSize="12.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0" />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Active Live Wallpaper Card -->
+            <Border Style="{StaticResource DuoCardStyle}" Margin="0,0,0,16">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="210" />
+                        <ColumnDefinition Width="16" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border Grid.Column="0" Height="112" CornerRadius="10" ClipToBounds="True" Background="#0F172A">
+                        <Image Source="{Binding ActiveVideoStillPath}" Stretch="UniformToFill" />
+                    </Border>
+
+                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                        <TextBlock Text="ACTIVE LIVE WALLPAPER" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                        <TextBlock Text="{Binding ActiveVideoTitle}" FontSize="16" FontWeight="Bold"
+                                   TextTrimming="CharacterEllipsis" Margin="0,2,0,8" />
+                        <WrapPanel>
+                            <CheckBox Content="Loop continuously (AC)" IsChecked="{Binding LoopLiveVideo}" Margin="0,0,16,4" />
+                            <CheckBox Content="Pause on Battery" IsChecked="{Binding PauseLiveOnBattery}" Margin="0,0,16,4" />
+                            <CheckBox Content="Pause in Full-Screen Apps" IsChecked="{Binding PauseLiveOnFullScreen}" Margin="0,0,0,4" />
+                        </WrapPanel>
+                    </StackPanel>
+
+                    <StackPanel Grid.Column="3" VerticalAlignment="Center" Margin="14,0,0,0">
+                        <ui:Button Appearance="Primary"
+                                   Command="{Binding StageVideoInPlacementStudioCommand}"
+                                   IsEnabled="{Binding HasActiveVideo}"
+                                   Margin="0,0,0,8" MinWidth="210">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Crop24" Margin="0,0,6,0" />
+                                <TextBlock Text="Adjust in Placement Studio" />
+                            </StackPanel>
+                        </ui:Button>
+                        <ui:Button Appearance="Danger"
+                                   Command="{Binding StopLiveVideoCommand}"
+                                   IsEnabled="{Binding HasActiveVideo}"
+                                   MinWidth="210">
+                            <TextBlock Text="Stop Live Video" />
+                        </ui:Button>
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- YouTube 4K / Ultrawide Search & Downloader -->
+            <Border Style="{StaticResource DuoCardStyle}" Margin="0,0,0,16">
+                <StackPanel>
+                    <TextBlock Text="SEARCH 4K / ULTRAWIDE VIDEOS FROM YOUTUBE" FontSize="11" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,10" />
+
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="230" />
+                            <ColumnDefinition Width="10" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ui:TextBox Grid.Column="0"
+                                    Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="Search YouTube (e.g. 4K ultrawide wallpaper loop, 32:9 cyber city)..."
+                                    KeyDown="SearchBox_KeyDown" />
+                        <ComboBox Grid.Column="2" ItemsSource="{Binding QualityOptions}" SelectedItem="{Binding SelectedQuality}" />
+                        <ui:Button Grid.Column="4" Appearance="Primary" Command="{Binding SearchYouTubeCommand}" IsEnabled="{Binding IsSearching, Converter={StaticResource InvBool}}">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Globe24" Margin="0,0,6,0" />
+                                <TextBlock Text="Search YouTube" />
+                            </StackPanel>
+                        </ui:Button>
+                    </Grid>
+
+                    <!-- Quick Preset Query Chips -->
+                    <ItemsControl ItemsSource="{Binding PresetQueries}" Margin="0,0,0,10">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <ui:Button Appearance="Secondary" Padding="10,5" Margin="0,0,6,6"
+                                           Command="{Binding DataContext.SearchPresetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                           CommandParameter="{Binding}">
+                                    <TextBlock Text="{Binding}" FontSize="11.5" />
+                                </ui:Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <!-- Download Progress Bar -->
+                    <StackPanel Visibility="{Binding IsDownloading, Converter={StaticResource BoolToVis}}" Margin="0,0,0,12">
+                        <TextBlock Text="{Binding DownloadStatusText}" FontSize="12" Foreground="#93C5FD" Margin="0,0,0,4" />
+                        <ProgressBar Value="{Binding DownloadProgress}" Maximum="1.0" Height="6" />
+                    </StackPanel>
+
+                    <TextBlock Text="Searching YouTube..."
+                               Visibility="{Binding IsSearching, Converter={StaticResource BoolToVis}}"
+                               FontSize="13" Foreground="#93C5FD" Margin="0,4,0,8" />
+
+                    <!-- YouTube Search Results Grid -->
+                    <ItemsControl ItemsSource="{Binding SearchResults}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource ControlFillColorDefaultBrush}"
+                                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                        BorderThickness="1" CornerRadius="10" Width="295" Margin="0,0,12,12" Padding="10">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="154" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <Border Grid.Row="0" CornerRadius="8" ClipToBounds="True" Background="#0F172A" Margin="0,0,0,8">
+                                            <Grid>
+                                                <Image Source="{Binding ThumbnailUrl}" Stretch="UniformToFill" />
+                                                <Border Background="#CC000000" CornerRadius="5" Padding="6,2"
+                                                        HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="6">
+                                                    <TextBlock Text="{Binding DurationText}" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+                                                </Border>
+                                            </Grid>
+                                        </Border>
+
+                                        <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="13" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" MaxHeight="38" TextWrapping="Wrap" Margin="0,0,0,3" />
+                                        <TextBlock Grid.Row="2" Text="{Binding Author}" FontSize="11.5"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" />
+
+                                        <Grid Grid.Row="3">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" /><ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="Auto" /><ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <ui:Button Grid.Column="0" Appearance="Primary" HorizontalAlignment="Stretch"
+                                                       ToolTip="Download video, open still frame in Placement Studio, and start playing when you click Apply Wallpaper"
+                                                       Command="{Binding DataContext.DownloadAndStageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                       CommandParameter="{Binding}">
+                                                <TextBlock Text="Apply Live" FontSize="11.5" />
+                                            </ui:Button>
+                                            <ui:Button Grid.Column="2" Appearance="Secondary" ToolTip="Save Video to My Wallpapers First"
+                                                       Command="{Binding DataContext.DownloadOnlyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                       CommandParameter="{Binding}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ui:SymbolIcon Symbol="ArrowDownload24" FontSize="14" Margin="0,0,4,0" />
+                                                    <TextBlock Text="Save" FontSize="11" />
+                                                </StackPanel>
+                                            </ui:Button>
+                                            <ui:Button Grid.Column="4" Appearance="Secondary" ToolTip="Download &amp; Play Immediately"
+                                                       Command="{Binding DataContext.DownloadAndApplyCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                       CommandParameter="{Binding}">
+                                                <ui:SymbolIcon Symbol="CheckmarkCircle24" FontSize="14" />
+                                            </ui:Button>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- Downloaded & Imported Local Videos Library -->
+            <Border Style="{StaticResource DuoCardStyle}">
+                <StackPanel>
+                    <DockPanel Margin="0,0,0,10">
+                        <ui:Button DockPanel.Dock="Right" Appearance="Secondary" Command="{Binding RefreshLocalVideosCommand}">
+                            <ui:SymbolIcon Symbol="ArrowClockwise24" />
+                        </ui:Button>
+                        <TextBlock Text="DOWNLOADED &amp; IMPORTED LIVE WALLPAPERS" FontSize="11" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
+                    </DockPanel>
+
+                    <TextBlock Text="No downloaded live videos yet. Search YouTube above or import a local MP4/WebM/MOV video."
+                               FontSize="12.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                               Visibility="{Binding LocalVideos.Count, Converter={StaticResource ZeroToVis}}" />
+
+                    <ItemsControl ItemsSource="{Binding LocalVideos}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource ControlFillColorDefaultBrush}"
+                                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                        BorderThickness="1" CornerRadius="10" Width="295" Margin="0,0,12,12" Padding="10">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="142" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <Border Grid.Row="0" CornerRadius="8" ClipToBounds="True" Background="#0F172A" Margin="0,0,0,8">
+                                            <Image Source="{Binding StillImagePath}" Stretch="UniformToFill" />
+                                        </Border>
+
+                                        <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="13" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis" Margin="0,0,0,2" />
+                                        <TextBlock Grid.Row="2" Text="{Binding FileSizeLabel}" FontSize="11.5"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,8" />
+
+                                        <Grid Grid.Row="3">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" /><ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="Auto" /><ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="Auto" /><ColumnDefinition Width="6" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <ui:Button Grid.Column="0" Appearance="Primary" HorizontalAlignment="Stretch"
+                                                       ToolTip="Open static frame in Placement Studio, adjust across monitors, then click Apply Wallpaper to play"
+                                                       Command="{Binding DataContext.StageVideoInPlacementStudioCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                       CommandParameter="{Binding}">
+                                                <TextBlock Text="Apply Live" FontSize="11.5" />
+                                            </ui:Button>
+                                            <ui:Button Grid.Column="2" Appearance="Secondary" ToolTip="Play Live Immediately"
+                                                       Command="{Binding DataContext.ApplyLocalVideoCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                       CommandParameter="{Binding}">
+                                                <ui:SymbolIcon Symbol="CheckmarkCircle24" FontSize="14" />
+                                            </ui:Button>
+                                            <ui:Button Grid.Column="4" Appearance="Secondary" ToolTip="Save to My Wallpapers"
+                                                       Command="{Binding DataContext.SaveLocalVideoToMyWallpapersCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                       CommandParameter="{Binding}">
+                                                <ui:SymbolIcon Symbol="Folder24" FontSize="14" />
+                                            </ui:Button>
+                                            <ui:Button Grid.Column="6" Appearance="Danger" ToolTip="Delete Video"
+                                                       Command="{Binding DataContext.DeleteLocalVideoCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                       CommandParameter="{Binding}">
+                                                <ui:SymbolIcon Symbol="Delete24" FontSize="14" />
+                                            </ui:Button>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
+

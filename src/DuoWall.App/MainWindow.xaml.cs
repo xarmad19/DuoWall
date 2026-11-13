@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using DuoWall.App.Services;
 using DuoWall.App.ViewModels;
 using Wpf.Ui.Controls;
 
@@ -13,6 +14,11 @@ public partial class MainWindow : FluentWindow
         InitializeComponent();
         DataContextChanged += OnDataContextChanged;
         UpdateVisiblePage(0);
+    }
+
+    public void AttachCoordinator(DesktopOverlayCoordinator coordinator)
+    {
+        ViewWidgetStudio.AttachCoordinator(coordinator);
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -50,5 +56,8 @@ public partial class MainWindow : FluentWindow
         ViewLibrary.Visibility = index == 3 ? Visibility.Visible : Visibility.Collapsed;
         ViewMonitors.Visibility = index == 4 ? Visibility.Visible : Visibility.Collapsed;
         ViewSettings.Visibility = index == 5 ? Visibility.Visible : Visibility.Collapsed;
+        ViewWidgetStudio.Visibility = index == 6 ? Visibility.Visible : Visibility.Collapsed;
+        ViewProfiles.Visibility = index == 7 ? Visibility.Visible : Visibility.Collapsed;
+        ViewTaskbarTweaks.Visibility = index == 9 ? Visibility.Visible : Visibility.Collapsed;
     }
 }

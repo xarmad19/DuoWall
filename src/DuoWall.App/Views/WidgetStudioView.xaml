@@ -1,0 +1,1235 @@
+<UserControl x:Class="DuoWall.App.Views.WidgetStudioView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+             xmlns:controls="clr-namespace:DuoWall.App.Controls">
+    <UserControl.Resources>
+        <!-- Clean selection style for widget list without solid harsh highlight rectangles -->
+        <Style x:Key="CleanWidgetListItemStyle" TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ListBoxItem">
+                        <Border x:Name="RowCard"
+                                Background="{DynamicResource ControlFillColorDefaultBrush}"
+                                BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}"
+                                BorderThickness="1"
+                                CornerRadius="9"
+                                Padding="10,8">
+                            <ContentPresenter />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="RowCard" Property="Background" Value="#1E3B82F6" />
+                                <Setter TargetName="RowCard" Property="BorderBrush" Value="#5560A5FA" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter TargetName="RowCard" Property="Background" Value="#263B82F6" />
+                                <Setter TargetName="RowCard" Property="BorderBrush" Value="#60A5FA" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Live font typeface preview inside dropdowns -->
+        <DataTemplate x:Key="LiveFontPreviewItemTemplate">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                <TextBlock Text="Aa  " FontFamily="{Binding}" FontWeight="Bold" FontSize="14" Foreground="#60A5FA" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding}" FontFamily="{Binding}" FontSize="13" VerticalAlignment="Center" />
+            </StackPanel>
+        </DataTemplate>
+    </UserControl.Resources>
+
+    <Grid>
+        <!-- MAIN WORKSPACE -->
+        <Grid Margin="22,14,22,18">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <!-- Header & Lock / Overlay Controls -->
+            <DockPanel Grid.Row="0" Margin="0,0,0,12">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <CheckBox Content="Show Desktop Widgets"
+                              IsChecked="{Binding EnableDesktopWidgets}"
+                              FontWeight="SemiBold"
+                              Margin="0,0,12,0" />
+                    <CheckBox Content="Snap to Grid"
+                              IsChecked="{Binding EnableSnapToGrid}"
+                              FontWeight="SemiBold"
+                              Margin="0,0,8,0" />
+                    <TextBlock Text="{Binding GridSizePx, StringFormat='{}{0}px'}" VerticalAlignment="Center" FontSize="11.5" Margin="0,0,4,0" />
+                    <Slider Minimum="4" Maximum="64" TickFrequency="4" IsSnapToTickEnabled="True" Width="68" VerticalAlignment="Center"
+                            Value="{Binding GridSizePx}" Margin="0,0,12,0" ToolTip="Snap Grid Size (px)" />
+                    <ui:Button Appearance="Secondary"
+                               Command="{Binding ToggleLayoutLockCommand}"
+                               Margin="0,0,10,0">
+                        <TextBlock Text="{Binding LayoutLockLabel}" FontWeight="SemiBold" />
+                    </ui:Button>
+                    <ui:Button Appearance="Secondary" Command="{Binding ImportPackageCommand}" Margin="0,0,8,0">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="FolderOpen24" Margin="0,0,6,0" />
+                            <TextBlock Text="Import .dwwp" />
+                        </StackPanel>
+                    </ui:Button>
+                    <ui:Button Appearance="Primary" Command="{Binding ExportDesktopProfilePackageCommand}">
+                        <TextBlock Text="Export Profile .dwwp" />
+                    </ui:Button>
+                </StackPanel>
+
+                <StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Widget Studio" FontSize="25" FontWeight="Bold" />
+                        <Border Background="#263B82F6" BorderBrush="#603B82F6" BorderThickness="1" CornerRadius="8"
+                                Padding="10,3" Margin="12,0,0,0" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding ActiveProfileBadge}" FontSize="12" FontWeight="SemiBold" Foreground="#93C5FD" />
+                        </Border>
+                    </StackPanel>
+                    <TextBlock Text="Click any widget or Edit to open its full configuration window · Supports Glassmorphism &amp; Rainmeter-inspired themes"
+                               FontSize="12.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0" />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- Studio Sub-Navigation Pills + Universal Accent Color Bar (3a) -->
+            <DockPanel Grid.Row="1" Margin="0,0,0,12">
+                <Border DockPanel.Dock="Right" Background="{DynamicResource ControlFillColorDefaultBrush}"
+                        BorderBrush="{DynamicResource ControlStrokeColorDefaultBrush}" BorderThickness="1"
+                        CornerRadius="10" Padding="10,4" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Text="Accent:" FontSize="11.5" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                   VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <ItemsControl ItemsSource="{Binding PresetAccentSwatches}" VerticalAlignment="Center" Margin="0,0,6,0">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate>
+                                    <Button Width="18" Height="18" Margin="2,0" Padding="0" Cursor="Hand"
+                                            Background="{Binding}" BorderBrush="#66FFFFFF" BorderThickness="1"
+                                            ToolTip="{Binding}"
+                                            Command="{Binding DataContext.SelectAccentColorCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            CommandParameter="{Binding}">
+                                        <Button.Resources>
+                                            <Style TargetType="Border"><Setter Property="CornerRadius" Value="9" /></Style>
+                                        </Button.Resources>
+                                    </Button>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <ui:TextBox Width="86" FontSize="11" Padding="6,2" Text="{Binding WidgetAccentColorHex, UpdateSourceTrigger=PropertyChanged}"
+                                    Margin="0,0,8,0" ToolTip="Custom Universal Accent Hex (e.g. #FF38BDF8)" />
+                        <CheckBox Content="Auto from Wallpaper" IsChecked="{Binding AutoAccentFromWallpaper}"
+                                  FontSize="11.5" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <ui:Button Appearance="Secondary" Padding="8,3" Command="{Binding PickAccentFromWallpaperCommand}"
+                                   ToolTip="Extract optimal accent color from active wallpaper">
+                            <ui:SymbolIcon Symbol="Eyedropper20" FontSize="14" />
+                        </ui:Button>
+                    </StackPanel>
+                </Border>
+
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <RadioButton Content="Widgets on Screen"
+                                 Style="{StaticResource PillRadioStyle}"
+                                 IsChecked="{Binding StudioSectionIndex, Converter={StaticResource EnumEq}, ConverterParameter=0}" />
+                    <RadioButton Content="Glassmorphism &amp; Surface Engine"
+                                 Style="{StaticResource PillRadioStyle}"
+                                 IsChecked="{Binding StudioSectionIndex, Converter={StaticResource EnumEq}, ConverterParameter=1}" />
+                    <RadioButton Content="Widget Marketplace"
+                                 Style="{StaticResource PillRadioStyle}"
+                                 IsChecked="{Binding StudioSectionIndex, Converter={StaticResource EnumEq}, ConverterParameter=2}" />
+                </StackPanel>
+            </DockPanel>
+
+            <!-- SECTION 0: WIDGETS ON SCREEN -->
+            <Grid Grid.Row="2">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding StudioSectionIndex}" Value="0">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="445" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Left Column: On-Screen Widgets with Inline Edit / Delete + Video -->
+                <Grid Grid.Column="0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="12" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Style="{StaticResource DuoCardStyle}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Grid.Row="0" Text="WIDGETS PRESENT ON SCREEN" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,10" />
+
+                            <Grid Grid.Row="1" Margin="0,0,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <ComboBox Grid.Column="0" ItemsSource="{Binding AvailableWidgetKinds}" SelectedItem="{Binding NewWidgetKind}" />
+                                <ui:Button Grid.Column="2" Appearance="Primary" Command="{Binding AddWidgetCommand}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <ui:SymbolIcon Symbol="Add24" Margin="0,0,4,0" />
+                                        <TextBlock Text="Add Widget" />
+                                    </StackPanel>
+                                </ui:Button>
+                            </Grid>
+
+                            <ListBox Grid.Row="2"
+                                     x:Name="ActiveWidgetsListBox"
+                                     ItemsSource="{Binding Widgets}"
+                                     SelectedItem="{Binding SelectedWidget}"
+                                     ItemContainerStyle="{StaticResource CleanWidgetListItemStyle}"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <DockPanel>
+                                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                                                <ui:Button Appearance="Secondary"
+                                                           Padding="9,5"
+                                                           Margin="6,0,6,0"
+                                                           ToolTip="Configure this widget's full options"
+                                                           Command="{Binding DataContext.ConfigureWidgetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                           CommandParameter="{Binding}">
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <ui:SymbolIcon Symbol="Settings24" FontSize="14" Margin="0,0,4,0" />
+                                                        <TextBlock Text="Edit" FontSize="12" />
+                                                    </StackPanel>
+                                                </ui:Button>
+                                                <ui:Button Appearance="Danger"
+                                                           Padding="8,5"
+                                                           ToolTip="Delete widget from screen"
+                                                           Command="{Binding DataContext.DeleteWidgetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                           CommandParameter="{Binding}">
+                                                    <ui:SymbolIcon Symbol="Delete24" FontSize="14" />
+                                                </ui:Button>
+                                            </StackPanel>
+
+                                            <StackPanel VerticalAlignment="Center" Margin="2,0">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <TextBlock Text="{Binding Title}" FontSize="13.5" FontWeight="SemiBold" />
+                                                    <Border Background="#2260A5FA" CornerRadius="5" Padding="6,1" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding TargetMonitorAnchor}" FontSize="10.5" Foreground="#93C5FD" FontWeight="SemiBold" />
+                                                    </Border>
+                                                </StackPanel>
+                                                <TextBlock FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,2,0,0">
+                                                    <Run Text="{Binding Kind}" />
+                                                    <Run Text="  ·  " />
+                                                    <Run Text="{Binding GlassStyle.SurfaceTheme}" />
+                                                    <Run Text="  ·  " />
+                                                    <Run Text="{Binding Width, StringFormat='{}{0:0}'}" />
+                                                    <Run Text="×" />
+                                                    <Run Text="{Binding Height, StringFormat='{}{0:0}'}" />
+                                                </TextBlock>
+                                            </StackPanel>
+                                        </DockPanel>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
+                        </Grid>
+                    </Border>
+
+                    <!-- Panoramic Video Wallpaper Layer -->
+                    <Border Grid.Row="2" Style="{StaticResource DuoCardStyle}">
+                        <StackPanel>
+                            <TextBlock Text="PANORAMIC VIDEO WALLPAPER LAYER" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,8" />
+                            <DockPanel Margin="0,0,0,8">
+                                <ui:Button DockPanel.Dock="Right" Appearance="Secondary" Command="{Binding ClearPanoramicVideoCommand}" Margin="6,0,0,0">
+                                    <TextBlock Text="Clear" />
+                                </ui:Button>
+                                <ui:Button DockPanel.Dock="Right" Appearance="Primary" Command="{Binding BrowsePanoramicVideoCommand}" Margin="6,0,0,0">
+                                    <TextBlock Text="Browse..." />
+                                </ui:Button>
+                                <ui:TextBox Text="{Binding PanoramicVideoPath, Mode=OneWay}" IsReadOnly="True" PlaceholderText="Select panoramic .mp4/.webm..." />
+                            </DockPanel>
+                            <CheckBox Content="Keep looping video continuously (AC setups)" IsChecked="{Binding LoopPanoramicVideo}" Margin="0,0,0,3" />
+                            <CheckBox Content="Pause on Battery" IsChecked="{Binding PauseVideoOnBattery}" Margin="0,0,0,3" />
+                            <CheckBox Content="Auto-pause when full-screen app runs" IsChecked="{Binding PauseVideoOnFullScreen}" />
+                        </StackPanel>
+                    </Border>
+                </Grid>
+
+                <!-- Right Column: Sharp Wallpaper Stage + Crisp Frosted/Rainmeter Live Widget Preview -->
+                <Border Grid.Column="2" Style="{StaticResource DuoCardStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <ui:Button Appearance="Secondary" Command="{Binding DuplicateWidgetCommand}" CommandParameter="{Binding SelectedWidget}" Margin="0,0,8,0">
+                                    <TextBlock Text="Duplicate" />
+                                </ui:Button>
+                                <ui:Button Appearance="Secondary" Command="{Binding ExportSelectedWidgetPackageCommand}" Margin="0,0,8,0">
+                                    <TextBlock Text="Export .dwwp" />
+                                </ui:Button>
+                                <ui:Button Appearance="Primary" Command="{Binding ConfigureWidgetCommand}" CommandParameter="{Binding SelectedWidget}">
+                                    <TextBlock Text="Open Widget Options" />
+                                </ui:Button>
+                            </StackPanel>
+                            <TextBlock Text="LIVE WIDGET STAGE (SHARP BACKDROP + TRUE INTERIOR BLUR)" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
+                        </DockPanel>
+
+                        <Border Grid.Row="1" CornerRadius="12" ClipToBounds="True" Background="#0F172A">
+                            <Grid>
+                                <!-- SHARP unblurred scenic wallpaper backdrop so real frosted refraction inside widgets is unmistakable -->
+                                <Image Source="{Binding SharpPreviewBackdrop}" Stretch="UniformToFill" />
+                                <Grid HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24">
+                                    <controls:WidgetContentControl x:Name="StudioSelectedWidgetPreview" MinWidth="300" MinHeight="160" />
+                                </Grid>
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Grid.Row="2" FontSize="11.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,10,0,0"
+                                   TextWrapping="Wrap"
+                                   Text="Tip: Click any widget on the left (or its Edit button) to configure city/API keys, clock format/timezone, telemetry metric checkboxes, or Rainmeter non-glass styles. Use Placement Studio or the Layout Lock toggle above to drag &amp; resize widgets across displays." />
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- SECTION 1: CENTRALIZED GLASSMORPHISM & SURFACE ENGINE -->
+            <Grid Grid.Row="2">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding StudioSectionIndex}" Value="1">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="480" />
+                    <ColumnDefinition Width="16" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <ScrollViewer Grid.Column="0" VerticalScrollBarVisibility="Auto" Padding="0,0,6,0">
+                    <StackPanel>
+                        <Border Style="{StaticResource DuoCardStyle}" Margin="0,0,0,12">
+                            <StackPanel>
+                                <TextBlock Text="GLASSMORPHISM &amp; RAINMETER STYLE PRESETS" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,8" />
+
+                                <ItemsControl ItemsSource="{Binding GlassPresets}" Margin="0,0,0,6">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <ui:Button Appearance="Secondary" Margin="0,0,6,6" Padding="9,5"
+                                                       Command="{Binding DataContext.SelectGlassPresetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                       CommandParameter="{Binding}">
+                                                <TextBlock Text="{Binding Name}" FontSize="11.5" />
+                                            </ui:Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <TextBlock Text="RAINMETER-INSPIRED NON-GLASS PRESETS" FontSize="10.5" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,2,0,6" />
+                                <ItemsControl ItemsSource="{Binding NonGlassRainmeterPresets}" Margin="0,0,0,8">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <ui:Button Appearance="Secondary" Margin="0,0,6,6" Padding="9,5"
+                                                       Command="{Binding DataContext.SelectGlassPresetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                       CommandParameter="{Binding}">
+                                                <TextBlock Text="{Binding Name}" FontSize="11.5" />
+                                            </ui:Button>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <Grid Margin="0,2,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="6" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:TextBox Grid.Column="0" Text="{Binding CustomGlassPresetName, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Custom preset name..." />
+                                    <ui:Button Grid.Column="2" Appearance="Primary" Command="{Binding SaveCustomGlassPresetCommand}">
+                                        <TextBlock Text="Save Preset" />
+                                    </ui:Button>
+                                    <ui:Button Grid.Column="4" Appearance="Danger" Command="{Binding DeleteCustomGlassPresetCommand}">
+                                        <TextBlock Text="Delete" />
+                                    </ui:Button>
+                                </Grid>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" /><ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" /><ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <ui:Button Grid.Column="0" Appearance="Primary" Command="{Binding ApplyGlassToAllGlobalWidgetsCommand}" HorizontalAlignment="Stretch">
+                                        <TextBlock Text="Apply Globally" />
+                                    </ui:Button>
+                                    <ui:Button Grid.Column="2" Appearance="Secondary" Command="{Binding ApplyGlassToSelectedWidgetCommand}" HorizontalAlignment="Stretch">
+                                        <TextBlock Text="Apply to Selected" />
+                                    </ui:Button>
+                                    <ui:Button Grid.Column="4" Appearance="Secondary" Command="{Binding ExportGlassSkinPackageCommand}">
+                                        <TextBlock Text="Export Skin" />
+                                    </ui:Button>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Style="{StaticResource DuoCardStyle}">
+                            <StackPanel>
+                                <TextBlock Text="SURFACE ENGINE &amp; 16 GLASSMORPHISM CONTROLS" FontSize="11" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,10" />
+
+                                <Grid Margin="0,0,0,10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Surface Engine" FontSize="11.5" Margin="0,0,0,4" />
+                                        <ComboBox ItemsSource="{Binding SurfaceThemes}" SelectedItem="{Binding GlassSurfaceTheme}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Glass Variant" FontSize="11.5" Margin="0,0,0,4" />
+                                        <ComboBox ItemsSource="{Binding AppearanceVariants}" SelectedItem="{Binding GlassAppearanceVariant}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <CheckBox Content="Enable Frosted Backdrop Blur (Active on Desktop &amp; Preview)"
+                                          IsChecked="{Binding GlassEnableBackdropBlur}" Margin="0,0,0,10" />
+
+                                <TextBlock Text="{Binding GlassBackgroundBlurIntensity, StringFormat='Backdrop Blur Intensity: {0:0} px'}" FontSize="12.5" FontWeight="SemiBold" Foreground="#93C5FD" />
+                                <Slider Minimum="0" Maximum="40" TickFrequency="1" Value="{Binding GlassBackgroundBlurIntensity}" Margin="0,0,0,8" />
+
+                                <TextBlock Text="{Binding GlassBackgroundTransparency, StringFormat='Background Transparency: {0:0.00}'}" FontSize="12" />
+                                <Slider Minimum="0" Maximum="0.98" TickFrequency="0.02" Value="{Binding GlassBackgroundTransparency}" Margin="0,0,0,6" />
+
+                                <TextBlock Text="{Binding GlassBackgroundOpacity, StringFormat='Surface Tint Opacity: {0:0.00}'}" FontSize="12" />
+                                <Slider Minimum="0.02" Maximum="0.95" TickFrequency="0.02" Value="{Binding GlassBackgroundOpacity}" Margin="0,0,0,6" />
+
+                                <TextBlock Text="{Binding GlassBorderTransparency, StringFormat='Border Transparency: {0:0.00}'}" FontSize="12" />
+                                <Slider Minimum="0" Maximum="1" TickFrequency="0.02" Value="{Binding GlassBorderTransparency}" Margin="0,0,0,6" />
+
+                                <TextBlock Text="{Binding GlassBorderThickness, StringFormat='Border Thickness: {0:0.0} px'}" FontSize="12" />
+                                <Slider Minimum="0" Maximum="5" TickFrequency="0.2" Value="{Binding GlassBorderThickness}" Margin="0,0,0,6" />
+
+                                <TextBlock Text="{Binding GlassCornerRadius, StringFormat='Corner Radius: {0:0} px'}" FontSize="12" />
+                                <Slider Minimum="0" Maximum="36" TickFrequency="1" Value="{Binding GlassCornerRadius}" Margin="0,0,0,6" />
+
+                                <TextBlock Text="{Binding GlassInnerShadowIntensity, StringFormat='Inner Shadow Intensity: {0:0.00}'}" FontSize="12" />
+                                <Slider Minimum="0" Maximum="1" TickFrequency="0.05" Value="{Binding GlassInnerShadowIntensity}" Margin="0,0,0,6" />
+
+                                <TextBlock Text="{Binding GlassOuterShadowIntensity, StringFormat='Outer Shadow Intensity: {0:0.00}'}" FontSize="12" />
+                                <Slider Minimum="0" Maximum="1" TickFrequency="0.05" Value="{Binding GlassOuterShadowIntensity}" Margin="0,0,0,6" />
+
+                                <TextBlock Text="{Binding GlassGlowIntensity, StringFormat='Glow Intensity: {0:0.00}'}" FontSize="12" />
+                                <Slider Minimum="0" Maximum="1" TickFrequency="0.05" Value="{Binding GlassGlowIntensity}" Margin="0,0,0,6" />
+
+                                <TextBlock Text="{Binding GlassHighlightIntensity, StringFormat='Specular Highlight &amp; Rim Bevel: {0:0.00}'}" FontSize="12" />
+                                <Slider Minimum="0" Maximum="1" TickFrequency="0.05" Value="{Binding GlassHighlightIntensity}" Margin="0,0,0,10" />
+
+                                <TextBlock Text="Quick Tint Swatches" FontSize="12" Margin="0,0,0,6" />
+                                <ItemsControl ItemsSource="{Binding QuickGlassSwatches}" Margin="0,0,0,8">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Width="26" Height="22" Margin="0,0,6,4" Cursor="Hand"
+                                                    Background="{Binding}" BorderBrush="#88FFFFFF" BorderThickness="1"
+                                                    Command="{Binding DataContext.ApplyGlassTintSwatchCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                    CommandParameter="{Binding}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" /><ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Tint Hex" FontSize="11" />
+                                        <ui:TextBox Text="{Binding GlassBackgroundTintHex, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Aurora 2nd Hex" FontSize="11" />
+                                        <ui:TextBox Text="{Binding GlassGradientSecondaryHex, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="Border Hex" FontSize="11" />
+                                        <ui:TextBox Text="{Binding GlassBorderColorHex, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="8" /><ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="Primary Text" FontSize="11" />
+                                        <ui:TextBox Text="{Binding GlassTextPrimaryHex, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock Text="Secondary Text" FontSize="11" />
+                                        <ui:TextBox Text="{Binding GlassTextSecondaryHex, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="4">
+                                        <TextBlock Text="Accent / Glow" FontSize="11" />
+                                        <ui:TextBox Text="{Binding GlassAccentHex, UpdateSourceTrigger=PropertyChanged}" />
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <Border Grid.Column="2" Style="{StaticResource DuoCardStyle}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <DockPanel Grid.Row="0" Margin="0,0,0,10">
+                            <TextBlock DockPanel.Dock="Right" Text="Slide Backdrop Blur 0→40 to inspect live interior frosting"
+                                       FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="OPTICAL GLASS &amp; SURFACE LIVE PREVIEW" FontSize="11" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" />
+                        </DockPanel>
+
+                        <Border Grid.Row="1" CornerRadius="14" ClipToBounds="True" Background="#0B1220">
+                            <Grid>
+                                <Image Source="{Binding SharpPreviewBackdrop}" Stretch="UniformToFill" />
+                                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Width="390" Margin="20">
+                                    <controls:WidgetContentControl x:Name="GlassPreviewClockSample" Height="155" Margin="0,0,0,18" />
+                                    <controls:WidgetContentControl x:Name="GlassPreviewStatsSample" Height="220" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <TextBlock Grid.Row="2" FontSize="11.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,10,0,0"
+                                   TextWrapping="Wrap"
+                                   Text="Notice how desktop widgets sample the exact underlying monitor wallpaper region with anti-aliased WPF vector clipping and feathered soft shadows—eliminating square corners while updating blur live in under 2ms." />
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- SECTION 2: MARKETPLACE & RAINMETER DESIGNS (WITH VISUAL PREVIEWS) -->
+            <Grid Grid.Row="2">
+                <Grid.Style>
+                    <Style TargetType="Grid">
+                        <Setter Property="Visibility" Value="Collapsed" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding StudioSectionIndex}" Value="2">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Grid.Style>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Style="{StaticResource DuoCardStyle}" Margin="0,0,0,12" Padding="14">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" /><ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="190" /><ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="160" /><ColumnDefinition Width="12" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ui:TextBox Grid.Column="0" Text="{Binding MarketplaceSearchText, UpdateSourceTrigger=PropertyChanged}"
+                                    PlaceholderText="Search Rainmeter styles, clocks, weather, telemetry, .dwwp packs..." />
+                        <ComboBox Grid.Column="2" ItemsSource="{Binding MarketplaceCategories}" SelectedItem="{Binding SelectedMarketplaceCategory}" />
+                        <ComboBox Grid.Column="4" ItemsSource="{Binding MarketplaceSortModes}" SelectedItem="{Binding SelectedMarketplaceSort}" />
+                        <ui:Button Grid.Column="6" Appearance="Primary" Command="{Binding ImportPackageCommand}">
+                            <TextBlock Text="Import .dwwp Package..." />
+                        </ui:Button>
+                    </Grid>
+                </Border>
+
+                <ui:InfoBar Grid.Row="1"
+                            Title="Package Validation Notice"
+                            Message="{Binding PackageWarningsBanner}"
+                            Severity="Warning"
+                            IsOpen="{Binding PackageWarningsBanner, Converter={StaticResource StrToBool}}"
+                            Margin="0,0,0,10" />
+
+                <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+                    <ItemsControl ItemsSource="{Binding FilteredMarketplaceEntries}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Style="{StaticResource DuoCardStyle}" Width="355" Margin="0,0,14,14" Padding="14">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="142" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+
+                                        <!-- Live Visual Mini-Preview Thumbnail of Widget (#7) -->
+                                        <Border Grid.Row="0" CornerRadius="10" ClipToBounds="True" Margin="0,0,0,10"
+                                                BorderBrush="#33FFFFFF" BorderThickness="1">
+                                            <controls:MarketplacePreviewHost
+                                                Entry="{Binding}"
+                                                BackdropImage="{Binding DataContext.SharpPreviewBackdrop, RelativeSource={RelativeSource AncestorType=UserControl}}" />
+                                        </Border>
+
+                                        <DockPanel Grid.Row="1" Margin="0,0,0,4">
+                                            <Border DockPanel.Dock="Right" Background="#243B82F6" CornerRadius="6" Padding="7,2">
+                                                <TextBlock Text="{Binding Manifest.GlassStyle.SurfaceTheme}" FontSize="10" Foreground="#93C5FD" FontWeight="SemiBold" />
+                                            </Border>
+                                            <TextBlock Text="{Binding Manifest.Name}" FontSize="14.5" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                                        </DockPanel>
+
+                                        <TextBlock Grid.Row="2" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,6">
+                                            <Run Text="{Binding Manifest.Category}" />
+                                            <Run Text=" · v" />
+                                            <Run Text="{Binding Manifest.Version}" />
+                                            <Run Text=" · by " />
+                                            <Run Text="{Binding Manifest.Author}" />
+                                            <Run Text=" · ★ " />
+                                            <Run Text="{Binding Manifest.Rating, StringFormat='{}{0:0.0}'}" />
+                                        </TextBlock>
+
+                                        <TextBlock Grid.Row="3" Text="{Binding Manifest.Description}" FontSize="12" TextWrapping="Wrap"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}" Margin="0,0,0,12" MinHeight="38" />
+
+                                        <WrapPanel Grid.Row="4" Orientation="Horizontal">
+                                            <ui:Button Appearance="Primary" Margin="0,0,8,0"
+                                                       Command="{Binding DataContext.AddMarketplaceEntryToDesktopCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                       CommandParameter="{Binding}">
+                                                <TextBlock Text="Add to Desktop" />
+                                            </ui:Button>
+                                            <ui:Button Appearance="Info" Margin="0,0,8,0"
+                                                       Visibility="{Binding IsOnDesktop, Converter={StaticResource BoolToVis}}"
+                                                       Command="{Binding DataContext.EditMarketplaceWidgetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                       CommandParameter="{Binding}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ui:SymbolIcon Symbol="Settings24" FontSize="13" Margin="0,0,4,0" />
+                                                    <TextBlock Text="Edit" FontWeight="SemiBold" />
+                                                </StackPanel>
+                                            </ui:Button>
+                                            <ui:Button Appearance="Secondary"
+                                                       Command="{Binding DataContext.UninstallMarketplacePackageCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                       CommandParameter="{Binding}">
+                                                <TextBlock Text="Uninstall" />
+                                            </ui:Button>
+                                        </WrapPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </Grid>
+
+        <!-- DEDICATED CONTEXTUAL WIDGET CONFIGURATION WINDOW MODAL (#4, #5, #6) -->
+        <Grid Background="#AA050810"
+              Visibility="{Binding IsWidgetConfigOpen, Converter={StaticResource BoolToVis}}">
+            <Border MaxWidth="700" MaxHeight="720" Margin="28"
+                    Background="{DynamicResource SolidBackgroundFillColorSecondaryBrush}"
+                    BorderBrush="#6060A5FA" BorderThickness="1.2" CornerRadius="14" Padding="22"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <!-- Modal Header -->
+                    <DockPanel Grid.Row="0" Margin="0,0,0,14">
+                        <ui:Button DockPanel.Dock="Right" Appearance="Secondary" Command="{Binding CloseWidgetConfigCommand}">
+                            <ui:SymbolIcon Symbol="Dismiss24" />
+                        </ui:Button>
+                        <StackPanel>
+                            <TextBlock Text="{Binding SelectedWidgetTitle, StringFormat='Configure Widget: {0}'}" FontSize="20" FontWeight="Bold" />
+                            <TextBlock Text="{Binding SelectedWidget.Kind, StringFormat='Type: {0} · Changes apply live to your desktop'}"
+                                       FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                    </DockPanel>
+
+                    <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,8,0">
+                        <StackPanel>
+                            <!-- General Widget Placement & Style -->
+                            <Border Style="{StaticResource DuoCardStyle}" Margin="0,0,0,12" Padding="14">
+                                <StackPanel>
+                                    <TextBlock Text="DISPLAY, POSITION &amp; VISUAL STYLE" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,10" />
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="10" />
+                                            <ColumnDefinition Width="140" /><ColumnDefinition Width="10" />
+                                            <ColumnDefinition Width="190" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Widget Name" FontSize="11.5" Margin="0,0,0,4" />
+                                            <ui:TextBox Text="{Binding SelectedWidgetTitle, UpdateSourceTrigger=PropertyChanged}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Target Monitor" FontSize="11.5" Margin="0,0,0,4" />
+                                            <ComboBox ItemsSource="{Binding MonitorAnchors}" SelectedItem="{Binding SelectedWidgetAnchor}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Text="Theme / Style Preset" FontSize="11.5" Margin="0,0,0,4" />
+                                            <ComboBox ItemsSource="{Binding AllSelectableStylePresets}" SelectedItem="{Binding SelectedWidgetPresetOverride}" DisplayMemberPath="Name" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="X (DIP)" FontSize="11" />
+                                            <ui:TextBox Text="{Binding SelectedWidgetX, UpdateSourceTrigger=LostFocus}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Y (DIP)" FontSize="11" />
+                                            <ui:TextBox Text="{Binding SelectedWidgetY, UpdateSourceTrigger=LostFocus}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Text="Width" FontSize="11" />
+                                            <ui:TextBox Text="{Binding SelectedWidgetWidth, UpdateSourceTrigger=LostFocus}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="6">
+                                            <TextBlock Text="Height" FontSize="11" />
+                                            <ui:TextBox Text="{Binding SelectedWidgetHeight, UpdateSourceTrigger=LostFocus}" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <WrapPanel Margin="0,0,0,6">
+                                        <CheckBox Content="Visible on Desktop" IsChecked="{Binding SelectedWidgetVisible}" Margin="0,0,16,6" />
+                                        <CheckBox Content="Click-Through (Ignore Mouse)" IsChecked="{Binding SelectedWidgetClickThrough}" Margin="0,0,16,6" />
+                                        <CheckBox Content="Minimal Animations" IsChecked="{Binding SelectedWidgetMinimalAnim}" Margin="0,0,16,6" />
+                                        <CheckBox Content="Inherit Global Glass Theme" IsChecked="{Binding SelectedWidgetUseGlobalGlass}" Margin="0,0,16,6" />
+                                    </WrapPanel>
+
+                                    <TextBlock Text="{Binding SelectedWidgetBrightness, StringFormat='Brightness Multiplier: {0:0.00}x'}" FontSize="11.5" />
+                                    <Slider Minimum="0.25" Maximum="1.20" TickFrequency="0.05" Value="{Binding SelectedWidgetBrightness}" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- WEATHER OPTIONS (#4) -->
+                            <Border Style="{StaticResource DuoCardStyle}" Margin="0,0,0,12" Padding="14"
+                                    Visibility="{Binding IsConfigWeather, Converter={StaticResource BoolToVis}}">
+                                <StackPanel>
+                                    <TextBlock Text="WEATHER CITY &amp; SERVICE PROVIDER" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,10" />
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="10" /><ColumnDefinition Width="150" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="City / Location (e.g. Lahore, London, New York)" FontSize="12" Margin="0,0,0,4" />
+                                            <ui:TextBox Text="{Binding ConfigWeatherCity, UpdateSourceTrigger=PropertyChanged}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Temperature Units" FontSize="12" Margin="0,0,0,4" />
+                                            <ComboBox ItemsSource="{Binding WeatherUnitOptions}" SelectedItem="{Binding ConfigWeatherUnit}" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="180" /><ColumnDefinition Width="10" /><ColumnDefinition Width="180" /><ColumnDefinition Width="10" /><ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Weather Provider Service" FontSize="12" Margin="0,0,0,4" />
+                                            <ComboBox ItemsSource="{Binding WeatherProviderOptions}" SelectedItem="{Binding ConfigWeatherProvider}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Icon Theme (Static / Animated)" FontSize="12" Margin="0,0,0,4" />
+                                            <ComboBox ItemsSource="{Binding WeatherIconThemeOptions}" SelectedItem="{Binding ConfigWeatherIconTheme}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Text="Provider API Key (Open-Meteo needs none)" FontSize="12" Margin="0,0,0,4" />
+                                            <ui:TextBox Text="{Binding ConfigWeatherApiKey, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Optional API key..." />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <WrapPanel Margin="0,0,0,10">
+                                        <CheckBox Content="Show Feels Like" IsChecked="{Binding ConfigWeatherShowFeelsLike}" Margin="0,0,14,6" />
+                                        <CheckBox Content="Show Humidity" IsChecked="{Binding ConfigWeatherShowHumidity}" Margin="0,0,14,6" />
+                                        <CheckBox Content="Show Wind Speed" IsChecked="{Binding ConfigWeatherShowWind}" Margin="0,0,14,6" />
+                                        <CheckBox Content="Show Provider Name" IsChecked="{Binding ConfigWeatherShowProvider}" Margin="0,0,14,6" />
+                                    </WrapPanel>
+
+                                    <ui:Button Appearance="Primary" Command="{Binding SaveAndTestWeatherCommand}" HorizontalAlignment="Left">
+                                        <TextBlock Text="Save &amp; Test Weather City / Provider" />
+                                    </ui:Button>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- ALL CLOCK OPTIONS (#5) -->
+                            <Border Style="{StaticResource DuoCardStyle}" Margin="0,0,0,12" Padding="14"
+                                    Visibility="{Binding IsConfigClock, Converter={StaticResource BoolToVis}}">
+                                <StackPanel>
+                                    <DockPanel Margin="0,0,0,10">
+                                        <ui:Button DockPanel.Dock="Right" Appearance="Secondary"
+                                                   Command="{Binding ApplyMinimalTransparentClockCommand}">
+                                            <TextBlock Text="Minimal Clock (No Glass Box)" FontSize="11.5" />
+                                        </ui:Button>
+                                        <TextBlock Text="FULL CLOCK, FONT, ELEMENT PLACEMENT &amp; RAINMETER OPTIONS" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
+                                    </DockPanel>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="155" /><ColumnDefinition Width="10" />
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="10" />
+                                            <ColumnDefinition Width="170" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Clock Face Mode" FontSize="11.5" Margin="0,0,0,4" />
+                                            <ComboBox ItemsSource="{Binding ClockModeOptions}" SelectedItem="{Binding ConfigClockMode}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Rainmeter / Stack Layout Preset" FontSize="11.5" Margin="0,0,0,4" />
+                                            <ComboBox ItemsSource="{Binding ClockLayoutOptions}" SelectedItem="{Binding ConfigClockLayout}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Text="Time Zone" FontSize="11.5" Margin="0,0,0,4" />
+                                            <ComboBox ItemsSource="{Binding TimeZoneOptions}" SelectedItem="{Binding ConfigTimeZoneId}" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <WrapPanel Margin="0,0,0,10">
+                                        <CheckBox Content="24-Hour" IsChecked="{Binding ConfigFormat24H}" Margin="0,0,12,6" />
+                                        <CheckBox Content="AM/PM" IsChecked="{Binding ConfigShowAmPm}" Margin="0,0,12,6" />
+                                        <CheckBox Content="Seconds" IsChecked="{Binding ConfigShowSeconds}" Margin="0,0,12,6" />
+                                        <CheckBox Content="Show Day" IsChecked="{Binding ConfigShowDay}" Margin="0,0,12,6" />
+                                        <CheckBox Content="Show Date" IsChecked="{Binding ConfigShowDate}" Margin="0,0,12,6" />
+                                        <CheckBox Content="Greeting Header" IsChecked="{Binding ConfigShowGreeting}" Margin="0,0,12,6" />
+                                    </WrapPanel>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Day Placement" FontSize="11" Margin="0,0,0,3" />
+                                            <ComboBox ItemsSource="{Binding DayPlacementOptions}" SelectedItem="{Binding ConfigDayPlacement}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Day Text Style" FontSize="11" Margin="0,0,0,3" />
+                                            <ComboBox ItemsSource="{Binding DayCaseStyleOptions}" SelectedItem="{Binding ConfigDayCaseStyle}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Text="Date Placement" FontSize="11" Margin="0,0,0,3" />
+                                            <ComboBox ItemsSource="{Binding DatePlacementOptions}" SelectedItem="{Binding ConfigDatePlacement}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="6">
+                                            <TextBlock Text="Date Format" FontSize="11" Margin="0,0,0,3" />
+                                            <ComboBox ItemsSource="{Binding DateFormatOptions}" SelectedItem="{Binding ConfigDateFormat}" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="1.4*" /><ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Master Font Family (All Fonts)" FontSize="11" Margin="0,0,0,3" />
+                                            <ComboBox ItemsSource="{Binding FontFamilyOptions}" SelectedItem="{Binding ConfigFontFamily}"
+                                                      ItemTemplate="{StaticResource LiveFontPreviewItemTemplate}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Weight" FontSize="11" Margin="0,0,0,3" />
+                                            <ComboBox ItemsSource="{Binding TimeFontWeightOptions}" SelectedItem="{Binding ConfigTimeFontWeight}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Text="H-Align" FontSize="11" Margin="0,0,0,3" />
+                                            <ComboBox ItemsSource="{Binding AlignmentOptions}" SelectedItem="{Binding ConfigAlignment}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="6">
+                                            <TextBlock Text="V-Align" FontSize="11" Margin="0,0,0,3" />
+                                            <ComboBox ItemsSource="{Binding VerticalAlignmentOptions}" SelectedItem="{Binding ConfigVerticalAlignment}" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="{Binding ConfigClockTimeBaseSize, StringFormat='Base Time Font Size: {0:0} pt'}" FontSize="11.5" />
+                                            <Slider Minimum="16" Maximum="220" TickFrequency="4" Value="{Binding ConfigClockTimeBaseSize}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="{Binding ConfigFontScale, StringFormat='Overall Scale Multiplier: {0:0.00}x'}" FontSize="11.5" />
+                                            <Slider Minimum="0.45" Maximum="4.00" TickFrequency="0.05" Value="{Binding ConfigFontScale}" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <!-- Per-Element Fonts, Scaling, and Accent / Custom Colors (#3h Typographic Clock) -->
+                                    <Border Background="{DynamicResource ControlFillColorDefaultBrush}" CornerRadius="8" Padding="10" Margin="0,0,0,10">
+                                        <StackPanel>
+                                            <TextBlock Text="PER-ITEM TYPOGRAPHY, SCALING &amp; ACCENT / CUSTOM COLORS" FontSize="10.5" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,8" />
+
+                                            <!-- Time Element -->
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="70" /><ColumnDefinition Width="1.2*" /><ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="*" /><ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="8" /><ColumnDefinition Width="82" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="Time" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <ComboBox Grid.Column="1" ItemsSource="{Binding FontFamilyOptions}" SelectedItem="{Binding ConfigTimeFontFamily}"
+                                                          ItemTemplate="{StaticResource LiveFontPreviewItemTemplate}" />
+                                                <StackPanel Grid.Column="3" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding ConfigTimeScale, StringFormat='Scale {0:0.0}x'}" FontSize="10" />
+                                                    <Slider Minimum="0.5" Maximum="2.5" TickFrequency="0.1" Value="{Binding ConfigTimeScale}" />
+                                                </StackPanel>
+                                                <CheckBox Grid.Column="5" Content="Accent" IsChecked="{Binding ConfigTimeUseAccent}" VerticalAlignment="Center" />
+                                                <ui:TextBox Grid.Column="7" FontSize="11" Text="{Binding ConfigTimeColorHex, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="#Hex" />
+                                            </Grid>
+
+                                            <!-- Day Element -->
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="70" /><ColumnDefinition Width="1.2*" /><ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="*" /><ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="8" /><ColumnDefinition Width="82" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="Day" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <ComboBox Grid.Column="1" ItemsSource="{Binding FontFamilyOptions}" SelectedItem="{Binding ConfigDayFontFamily}"
+                                                          ItemTemplate="{StaticResource LiveFontPreviewItemTemplate}" />
+                                                <StackPanel Grid.Column="3" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding ConfigDayScale, StringFormat='Scale {0:0.0}x'}" FontSize="10" />
+                                                    <Slider Minimum="0.5" Maximum="2.5" TickFrequency="0.1" Value="{Binding ConfigDayScale}" />
+                                                </StackPanel>
+                                                <CheckBox Grid.Column="5" Content="Accent" IsChecked="{Binding ConfigDayUseAccent}" VerticalAlignment="Center" />
+                                                <ui:TextBox Grid.Column="7" FontSize="11" Text="{Binding ConfigDayColorHex, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="#Hex" />
+                                            </Grid>
+
+                                            <!-- Date Element -->
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="70" /><ColumnDefinition Width="1.2*" /><ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="*" /><ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="8" /><ColumnDefinition Width="82" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="Date" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <ComboBox Grid.Column="1" ItemsSource="{Binding FontFamilyOptions}" SelectedItem="{Binding ConfigDateFontFamily}"
+                                                          ItemTemplate="{StaticResource LiveFontPreviewItemTemplate}" />
+                                                <StackPanel Grid.Column="3" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding ConfigDateScale, StringFormat='Scale {0:0.0}x'}" FontSize="10" />
+                                                    <Slider Minimum="0.5" Maximum="2.5" TickFrequency="0.1" Value="{Binding ConfigDateScale}" />
+                                                </StackPanel>
+                                                <CheckBox Grid.Column="5" Content="Accent" IsChecked="{Binding ConfigDateUseAccent}" VerticalAlignment="Center" />
+                                                <ui:TextBox Grid.Column="7" FontSize="11" Text="{Binding ConfigDateColorHex, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="#Hex" />
+                                            </Grid>
+
+                                            <!-- Greeting Element -->
+                                            <Grid>
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="70" /><ColumnDefinition Width="1.2*" /><ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="*" /><ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="8" /><ColumnDefinition Width="82" />
+                                                </Grid.ColumnDefinitions>
+                                                <TextBlock Grid.Column="0" Text="Label" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                <ComboBox Grid.Column="1" ItemsSource="{Binding FontFamilyOptions}" SelectedItem="{Binding ConfigGreetingFontFamily}"
+                                                          ItemTemplate="{StaticResource LiveFontPreviewItemTemplate}" />
+                                                <StackPanel Grid.Column="3" VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding ConfigGreetingScale, StringFormat='Scale {0:0.0}x'}" FontSize="10" />
+                                                    <Slider Minimum="0.5" Maximum="2.5" TickFrequency="0.1" Value="{Binding ConfigGreetingScale}" />
+                                                </StackPanel>
+                                                <CheckBox Grid.Column="5" Content="Accent" IsChecked="{Binding ConfigGreetingUseAccent}" VerticalAlignment="Center" />
+                                                <ui:TextBox Grid.Column="7" FontSize="11" Text="{Binding ConfigGreetingColorHex, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="#Hex" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Grid Margin="0,0,0,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="155" /><ColumnDefinition Width="8" />
+                                            <ColumnDefinition Width="125" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Custom Label / Greeting Text" FontSize="11" Margin="0,0,0,3" />
+                                            <ui:TextBox Text="{Binding ConfigCustomGreeting, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Optional custom text..." />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Analog Dial Style" FontSize="11" Margin="0,0,0,3" />
+                                            <ComboBox ItemsSource="{Binding AnalogDialOptions}" SelectedItem="{Binding ConfigAnalogDialStyle}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="4">
+                                            <TextBlock Text="Clock Accent Hex" FontSize="11" Margin="0,0,0,3" />
+                                            <ui:TextBox Text="{Binding ConfigClockAccentHex, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="#60A5FA" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <TextBlock Text="{Binding ConfigClockTextShadow, StringFormat='Drop Shadow Strength: {0:0.00}'}" FontSize="11.5" />
+                                    <Slider Minimum="0" Maximum="1" TickFrequency="0.05" Value="{Binding ConfigClockTextShadow}" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- SYSTEM TELEMETRY SELECTABLE OPTIONS (#6) -->
+                            <Border Style="{StaticResource DuoCardStyle}" Margin="0,0,0,12" Padding="14"
+                                    Visibility="{Binding IsConfigSystemStats, Converter={StaticResource BoolToVis}}">
+                                <StackPanel>
+                                    <TextBlock Text="SYSTEM TELEMETRY DISPLAY OPTIONS" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,10" />
+
+                                    <TextBlock Text="HUD Layout Style" FontSize="11.5" Margin="0,0,0,4" />
+                                    <ComboBox ItemsSource="{Binding StatsLayoutOptions}" SelectedItem="{Binding ConfigStatsLayout}" Width="220" HorizontalAlignment="Left" Margin="0,0,0,10" />
+
+                                    <TextBlock Text="Select Which Hardware Metrics to Display on Screen:" FontSize="12" FontWeight="SemiBold" Margin="0,0,0,8" />
+                                    <UniformGrid Columns="2">
+                                        <CheckBox Content="CPU Usage (%)" IsChecked="{Binding ConfigStatsShowCpu}" Margin="0,0,0,6" />
+                                        <CheckBox Content="RAM / Memory Usage" IsChecked="{Binding ConfigStatsShowRam}" Margin="0,0,0,6" />
+                                        <CheckBox Content="Network Speed (↓ Down / ↑ Up)" IsChecked="{Binding ConfigStatsShowNet}" Margin="0,0,0,6" />
+                                        <CheckBox Content="Storage Disk Usage" IsChecked="{Binding ConfigStatsShowDisk}" Margin="0,0,0,6" />
+                                        <CheckBox Content="Show All Fixed Drives" IsChecked="{Binding ConfigStatsShowAllDrives}" Margin="0,0,0,6" />
+                                        <CheckBox Content="GPU Name" IsChecked="{Binding ConfigStatsShowGpu}" Margin="0,0,0,6" />
+                                        <CheckBox Content="CPU &amp; GPU Temperatures" IsChecked="{Binding ConfigStatsShowTemps}" Margin="0,0,0,6" />
+                                        <CheckBox Content="System Uptime" IsChecked="{Binding ConfigStatsShowUptime}" Margin="0,0,0,6" />
+                                        <CheckBox Content="Battery / AC Power Status" IsChecked="{Binding ConfigStatsShowPower}" Margin="0,0,0,6" />
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- FOCUS TIMER OPTIONS (#3d) -->
+                            <Border Style="{StaticResource DuoCardStyle}" Margin="0,0,0,12" Padding="14"
+                                    Visibility="{Binding IsConfigFocusTimer, Converter={StaticResource BoolToVis}}">
+                                <StackPanel>
+                                    <TextBlock Text="FOCUS TIMER DURATIONS &amp; PRESETS" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,8" />
+                                    <WrapPanel Margin="0,0,0,8">
+                                        <TextBlock Text="Quick Focus:" FontSize="11.5" VerticalAlignment="Center" Margin="0,0,8,4" />
+                                        <ItemsControl ItemsSource="{Binding FocusDurationPresetLabels}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <ui:Button Appearance="Secondary" Padding="9,4" Margin="0,0,6,4"
+                                                               Command="{Binding DataContext.ApplyFocusPresetCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                               CommandParameter="{Binding}">
+                                                        <TextBlock Text="{Binding StringFormat='{}{0} min'}" FontSize="11.5" />
+                                                    </ui:Button>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </WrapPanel>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" /><ColumnDefinition Width="12" /><ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Work Session (Minutes)" FontSize="11.5" Margin="0,0,0,4" />
+                                            <ui:TextBox Text="{Binding WidgetFocusWorkMinutes, UpdateSourceTrigger=PropertyChanged}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2">
+                                            <TextBlock Text="Break Session (Minutes)" FontSize="11.5" Margin="0,0,0,4" />
+                                            <ui:TextBox Text="{Binding WidgetFocusBreakMinutes, UpdateSourceTrigger=PropertyChanged}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- APP & WEBSITE SHORTCUT DOCK BAR CONFIGURATOR (#3g) -->
+                            <Border Style="{StaticResource DuoCardStyle}" Margin="0,0,0,12" Padding="14"
+                                    Visibility="{Binding IsConfigShortcutBar, Converter={StaticResource BoolToVis}}">
+                                <StackPanel>
+                                    <DockPanel Margin="0,0,0,8">
+                                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                            <ui:Button Appearance="Primary" Padding="10,4" Margin="0,0,6,0" Command="{Binding AddShortcutAppCommand}">
+                                                <TextBlock Text="+ Add App" FontSize="11.5" />
+                                            </ui:Button>
+                                            <ui:Button Appearance="Secondary" Padding="10,4" Margin="0,0,6,0" Command="{Binding AddShortcutFolderCommand}">
+                                                <TextBlock Text="+ Add Folder" FontSize="11.5" />
+                                            </ui:Button>
+                                            <ui:Button Appearance="Secondary" Padding="10,4" Command="{Binding AddShortcutWebsiteCommand}">
+                                                <TextBlock Text="+ Add Website" FontSize="11.5" />
+                                            </ui:Button>
+                                        </StackPanel>
+                                        <TextBlock Text="APP, FOLDER &amp; WEBSITE SHORTCUTS / DOCK BAR" FontSize="11" FontWeight="SemiBold"
+                                                   Foreground="{DynamicResource TextFillColorTertiaryBrush}" VerticalAlignment="Center" />
+                                    </DockPanel>
+
+                                    <Grid Margin="0,0,0,10">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" /><ColumnDefinition Width="20" /><ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <TextBlock Text="Bar Orientation:" FontSize="11.5" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                            <ComboBox Width="140" ItemsSource="{Binding ShortcutLayoutOptions}" SelectedItem="{Binding ConfigShortcutLayout}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" VerticalAlignment="Center" MaxWidth="320" HorizontalAlignment="Stretch">
+                                            <DockPanel Margin="0,0,0,2">
+                                                <TextBlock DockPanel.Dock="Right" Text="{Binding ConfigShortcutIconScale, StringFormat='{}{0:0.00}×'}"
+                                                           FontSize="11.5" FontWeight="SemiBold" Foreground="#93C5FD" />
+                                                <TextBlock Text="Icon Scale" FontSize="11.5" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
+                                            </DockPanel>
+                                            <Slider Minimum="0.45" Maximum="2.50" TickFrequency="0.05" IsSnapToTickEnabled="False"
+                                                    Value="{Binding ConfigShortcutIconScale}" />
+                                        </StackPanel>
+                                    </Grid>
+
+                                    <ListBox ItemsSource="{Binding ShortcutItems}" SelectedItem="{Binding SelectedShortcutItem}"
+                                             MaxHeight="130" Margin="0,0,0,10" Background="Transparent" BorderThickness="0">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate>
+                                                <DockPanel Margin="2">
+                                                    <ui:Button DockPanel.Dock="Right" Appearance="Danger" Padding="6,2"
+                                                               Command="{Binding DataContext.DeleteShortcutItemCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                               CommandParameter="{Binding}">
+                                                        <ui:SymbolIcon Symbol="Delete24" FontSize="12" />
+                                                    </ui:Button>
+                                                    <StackPanel Orientation="Horizontal">
+                                                        <Border Background="#2638BDF8" CornerRadius="5" Padding="6,2" Margin="0,0,8,0">
+                                                            <TextBlock Text="{Binding IconMode}" FontSize="10" Foreground="#93C5FD" />
+                                                        </Border>
+                                                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="12" Margin="0,0,8,0" VerticalAlignment="Center" />
+                                                        <TextBlock Text="{Binding TargetPathOrUrl}" FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                                   TextTrimming="CharacterEllipsis" MaxWidth="220" VerticalAlignment="Center" />
+                                                    </StackPanel>
+                                                </DockPanel>
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+
+                                    <Border Background="{DynamicResource ControlFillColorDefaultBrush}" CornerRadius="8" Padding="10">
+                                        <StackPanel>
+                                            <TextBlock Text="EDIT SELECTED SHORTCUT (Shown on hover &amp; click)" FontSize="10.5" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,6" />
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="150" /><ColumnDefinition Width="8" /><ColumnDefinition Width="*" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock Text="Hover Name" FontSize="11" Margin="0,0,0,2" />
+                                                    <ui:TextBox Text="{Binding EditShortcutLabel, UpdateSourceTrigger=PropertyChanged}" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="2">
+                                                    <TextBlock Text="App Path (.exe) or Website URL" FontSize="11" Margin="0,0,0,2" />
+                                                    <ui:TextBox Text="{Binding EditShortcutTarget, UpdateSourceTrigger=PropertyChanged}" />
+                                                </StackPanel>
+                                            </Grid>
+                                            <Grid Margin="0,0,0,8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="125" /><ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="Auto" /><ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="105" /><ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="68" /><ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="88" /><ColumnDefinition Width="8" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0">
+                                                    <TextBlock Text="Icon Style" FontSize="11" Margin="0,0,0,2" />
+                                                    <ComboBox ItemsSource="{Binding ShortcutIconModes}" SelectedItem="{Binding EditShortcutIconMode}" />
+                                                </StackPanel>
+                                                <ui:Button Grid.Column="2" Appearance="Secondary" VerticalAlignment="Bottom" Padding="9,6"
+                                                           Command="{Binding UploadShortcutCustomIconCommand}" ToolTip="Upload custom PNG / ICO / JPG icon">
+                                                    <TextBlock Text="Upload Icon..." FontSize="11" />
+                                                </ui:Button>
+                                                <StackPanel Grid.Column="4">
+                                                    <TextBlock Text="Glass Glyph" FontSize="11" Margin="0,0,0,2" />
+                                                    <ComboBox ItemsSource="{Binding ShortcutGlyphKeys}" SelectedItem="{Binding EditShortcutGlyphKey}" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="6">
+                                                    <TextBlock Text="Initials" FontSize="11" Margin="0,0,0,2" />
+                                                    <ui:TextBox Text="{Binding EditShortcutInitials, UpdateSourceTrigger=PropertyChanged}" MaxLength="3" />
+                                                </StackPanel>
+                                                <StackPanel Grid.Column="8">
+                                                    <TextBlock Text="Tint Hex" FontSize="11" Margin="0,0,0,2" />
+                                                    <ui:TextBox Text="{Binding EditShortcutColorHex, UpdateSourceTrigger=PropertyChanged}" />
+                                                </StackPanel>
+                                                <ui:Button Grid.Column="10" Appearance="Primary" VerticalAlignment="Bottom" Command="{Binding UpdateSelectedShortcutItemCommand}">
+                                                    <TextBlock Text="Apply Tile" FontSize="11.5" />
+                                                </ui:Button>
+                                            </Grid>
+                                            <TextBlock Text="{Binding EditShortcutCustomIconPath, StringFormat='Custom icon file: {0}'}"
+                                                       Visibility="{Binding EditShortcutCustomIconPath, Converter={StaticResource StrToBool}}"
+                                                       FontSize="10.5" Foreground="#93C5FD" TextTrimming="CharacterEllipsis" />
+                                        </StackPanel>
+                                    </Border>
+                                </StackPanel>
+                            </Border>
+
+                            <!-- GENERIC / CUSTOM TEXT -->
+                            <Border Style="{StaticResource DuoCardStyle}" Padding="14"
+                                    Visibility="{Binding IsConfigGenericOrCustom, Converter={StaticResource BoolToVis}}">
+                                <StackPanel>
+                                    <TextBlock Text="CUSTOM SUBTITLE / NOTE" FontSize="11.5" Margin="0,0,0,4" />
+                                    <ui:TextBox Text="{Binding WidgetCustomSubtitle, UpdateSourceTrigger=PropertyChanged}" PlaceholderText="Optional subtitle shown inside custom widgets..." />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <!-- Modal Footer -->
+                    <DockPanel Grid.Row="2" Margin="0,14,0,0">
+                        <ui:Button DockPanel.Dock="Right" Appearance="Primary" Command="{Binding CloseWidgetConfigCommand}" Padding="18,8">
+                            <TextBlock Text="Done &amp; Save" FontWeight="SemiBold" />
+                        </ui:Button>
+                        <ui:Button Appearance="Danger" Command="{Binding DeleteWidgetCommand}" CommandParameter="{Binding SelectedWidget}">
+                            <TextBlock Text="Delete Widget" />
+                        </ui:Button>
+                    </DockPanel>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

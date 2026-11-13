@@ -30,13 +30,36 @@
                             BorderThickness="1"
                             CornerRadius="12"
                             Padding="10,4"
-                            Margin="0,0,10,0">
+                            Margin="0,0,14,0">
                         <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                             <ui:SymbolIcon Symbol="Desktop24" FontSize="14" Foreground="#60A5FA" Margin="0,0,6,0" />
                             <TextBlock Text="{Binding MonitorSummaryHeader}" FontSize="11.5"
                                        Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
                     </Border>
+
+                    <!-- Top Action Menu Buttons -->
+                    <ui:Button Appearance="Transparent"
+                               Padding="10,4"
+                               Margin="0,0,6,0"
+                               Command="{Binding CheckForUpdatesCommand}"
+                               ToolTip="Check GitHub for newer versions of DuoWall">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="ArrowSync24" FontSize="13" Foreground="#38BDF8" Margin="0,0,6,0" />
+                            <TextBlock Text="Check for Updates" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ui:Button>
+
+                    <ui:Button Appearance="Transparent"
+                               Padding="10,4"
+                               Margin="0,0,6,0"
+                               Command="{Binding ShowAboutMeCommand}"
+                               ToolTip="About DuoWall &amp; Developer Contact">
+                        <StackPanel Orientation="Horizontal">
+                            <ui:SymbolIcon Symbol="Person24" FontSize="13" Foreground="#A78BFA" Margin="0,0,6,0" />
+                            <TextBlock Text="About Me" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </ui:Button>
                 </StackPanel>
             </ui:TitleBar.Header>
         </ui:TitleBar>
@@ -131,6 +154,33 @@
                             </StackPanel>
                         </RadioButton>
 
+                        <RadioButton Style="{StaticResource NavRailRadioStyle}"
+                                     IsChecked="{Binding CurrentPageIndex, Converter={StaticResource EnumEq}, ConverterParameter=6}"
+                                     Click="NavButton_Click" Tag="6">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Star24" FontSize="17" Margin="0,0,12,0" />
+                                <TextBlock Text="Widget Studio" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton Style="{StaticResource NavRailRadioStyle}"
+                                     IsChecked="{Binding CurrentPageIndex, Converter={StaticResource EnumEq}, ConverterParameter=7}"
+                                     Click="NavButton_Click" Tag="7">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Color20" FontSize="17" Margin="0,0,12,0" />
+                                <TextBlock Text="Desktop Profiles" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+
+                        <RadioButton Style="{StaticResource NavRailRadioStyle}"
+                                     IsChecked="{Binding CurrentPageIndex, Converter={StaticResource EnumEq}, ConverterParameter=9}"
+                                     Click="NavButton_Click" Tag="9">
+                            <StackPanel Orientation="Horizontal">
+                                <ui:SymbolIcon Symbol="Window24" FontSize="17" Margin="0,0,12,0" />
+                                <TextBlock Text="Taskbar Tweaks" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </RadioButton>
+
                         <TextBlock Text="SYSTEM" FontSize="10.5" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextFillColorTertiaryBrush}"
                                    Margin="16,18,0,6" />
@@ -182,6 +232,9 @@
                         <views:LibraryView x:Name="ViewLibrary" Visibility="Collapsed" />
                         <views:MonitorsView x:Name="ViewMonitors" Visibility="Collapsed" />
                         <views:SettingsView x:Name="ViewSettings" Visibility="Collapsed" />
+                        <views:WidgetStudioView x:Name="ViewWidgetStudio" DataContext="{Binding WidgetStudio}" Visibility="Collapsed" />
+                        <views:ProfilesView x:Name="ViewProfiles" DataContext="{Binding Profiles}" Visibility="Collapsed" />
+                        <views:TaskbarTweaksView x:Name="ViewTaskbarTweaks" DataContext="{Binding TaskbarTweaks}" Visibility="Collapsed" />
                     </Grid>
 
                     <!-- Wallpaper Detail Modal Overlay -->

@@ -1,3 +1,0 @@
-C:\Users\Sarmad\.gemini\antigravity\scratch\DuoWall\publish\DuoWall-Portable\DuoWall.pdb
-C:\Users\Sarmad\.gemini\antigravity\scratch\DuoWall\publish\DuoWall-Portable\DuoWall.Core.pdb
-C:\Users\Sarmad\.gemini\antigravity\scratch\DuoWall\publish\DuoWall-Portable\DuoWall.exe

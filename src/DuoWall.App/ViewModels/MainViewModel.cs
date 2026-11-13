@@ -1,16 +1,20 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
+using System.Text.Json;
 using System.Windows;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using DuoWall.App.Helpers;
+using DuoWall.App.Services;
 using DuoWall.App.Windows;
 using DuoWall.Core.Engine;
 using DuoWall.Core.Gallery;
 using DuoWall.Core.Models;
+using DuoWall.Core.Packages;
 using DuoWall.Core.Services;
 using DuoWall.Core.Storage;
+using DuoWall.Core.Theming;
 using Microsoft.Win32;
 using Wpf.Ui.Appearance;
 
@@ -26,11 +30,18 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     private readonly WallpaperLibraryService _libraryService;
     private readonly DuoWallDatabase _db;
     private readonly StartupAndWatcherService _watcher;
+    private readonly WeatherService _weatherService;
+    private readonly GitHubReleaseService _releaseService;
+    private readonly DesktopOverlayCoordinator _overlayCoordinator;
+    private readonly TaskbarTweaksService _taskbarTweaksService;
+    private readonly CustomWebsiteGalleryProvider _customSiteProvider = new();
 
     private CancellationTokenSource? _galleryCts;
     private CancellationTokenSource? _searchDebounceCts;
     private string _liveTopologySignature = string.Empty;
     private bool _suppressPlanRecompute;
+    private bool _suppressRgbSync;
+    private bool _suppressGallerySourceSync;
 
     // Navigation & Banner State
     [ObservableProperty] private int _currentPageIndex;
@@ -78,7 +89,17 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private double _cropTop;
     [ObservableProperty] private double _cropRight;
     [ObservableProperty] private double _cropBottom;
+    [ObservableProperty] private bool _flipHorizontal;
+    [ObservableProperty] private bool _flipVertical;
+    [ObservableProperty] private bool _autoApplyStudioChanges = true;
+    [ObservableProperty] private bool _isStudioBoxSelectMode;
     [ObservableProperty] private string _backgroundColorHex = "#0D1017";
+    private CancellationTokenSource? _studioApplyDebounceCts;
+    [ObservableProperty] private string _normalizedBackgroundBrushHex = "#0D1017";
+    [ObservableProperty] private bool _isColorPickerOpen;
+    [ObservableProperty] private byte _bgRed = 13;
+    [ObservableProperty] private byte _bgGreen = 16;
+    [ObservableProperty] private byte _bgBlue = 23;
     [ObservableProperty] private bool _showMonitorLabels = true;
     [ObservableProperty] private bool _isIndividualMode;
 
@@ -87,7 +108,10 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public IReadOnlyList<string> GalleryCategories { get; } =
         UltraWideWallpapersProvider.BuiltInFilterCategories.Concat(new[] { "Favorites" }).ToArray();
     public IReadOnlyList<GallerySortMode> SortModes { get; } = Enum.GetValues<GallerySortMode>();
+    public IReadOnlyList<string> GallerySourceOptions { get; } = new[] { "UltraWideWallpapers.net", "Custom Website" };
 
+    [ObservableProperty] private string _selectedGallerySource = "UltraWideWallpapers.net";
+    [ObservableProperty] private string _customGallerySiteUrl = string.Empty;
     [ObservableProperty] private string _selectedGalleryCategory = "All";
     [ObservableProperty] private GallerySortMode _selectedSortMode = GallerySortMode.Recent;
     [ObservableProperty] private string _gallerySearchText = string.Empty;
@@ -118,6 +142,21 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private string _generatedCacheSizeText = "0 MB";
     [ObservableProperty] private bool _hasWindowsBackup;
 
+    // V2.0 Widget Studio, Weather & Release Update Check State
+    [ObservableProperty] private bool _enableDesktopWidgets = true;
+    [ObservableProperty] private string _weatherCity = "Lahore";
+    [ObservableProperty] private bool _weatherUseFahrenheit;
+    [ObservableProperty] private string _customWeatherApiKey = string.Empty;
+    [ObservableProperty] private string _gitHubRepositorySlug = GitHubReleaseService.DefaultRepoSlug;
+    [ObservableProperty] private string _latestReleasePageUrl = $"https://github.com/{GitHubReleaseService.DefaultRepoSlug}/releases";
+    [ObservableProperty] private bool _isVideoWallpaperStaged;
+    private string? _stagedLiveVideoPath;
+
+    public WidgetStudioViewModel WidgetStudio { get; }
+    public ProfilesViewModel Profiles { get; }
+    public LiveWallpaperViewModel LiveWallpaper { get; }
+    public TaskbarTweaksViewModel TaskbarTweaks { get; }
+
     public AppSettings Settings { get; private set; }
 
     public IReadOnlyList<WallpaperPlacementMode> PlacementModes { get; } = Enum.GetValues<WallpaperPlacementMode>();
@@ -125,7 +164,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     public IReadOnlyList<PhysicalVerticalAlignment> PhysicalAlignments { get; } = Enum.GetValues<PhysicalVerticalAlignment>();
     public IReadOnlyList<string> BackgroundSwatches { get; } = new[]
     {
-        "#0D1017", "#000000", "#18181B", "#1E293B", "#0F172A", "#27272A", "#F8FAFC"
+        "#000000", "#0D1017", "#18181B", "#1E293B", "#0F172A",
+        "#14532D", "#450A0A", "#312E81", "#CBD5E1", "#FFFFFF"
     };
 
     private readonly Dictionary<string, PerMonitorAssignment> _individualAssignments = new(StringComparer.OrdinalIgnoreCase);
@@ -139,7 +179,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         IWallpaperSourceProvider galleryProvider,
         WallpaperLibraryService libraryService,
         DuoWallDatabase db,
-        StartupAndWatcherService watcher)
+        StartupAndWatcherService watcher,
+        WeatherService weatherService,
+        WallpaperColorAnalyzer colorAnalyzer,
+        WidgetPackageService packageService,
+        LocalWidgetMarketplaceProvider marketplaceProvider,
+        GitHubReleaseService releaseService,
+        YouTubeWallpaperService youtubeService,
+        TaskbarTweaksService taskbarTweaksService,
+        DesktopOverlayCoordinator overlayCoordinator)
     {
         _displayDetector = displayDetector;
         _wallpaperApplier = wallpaperApplier;
@@ -149,8 +197,70 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _libraryService = libraryService;
         _db = db;
         _watcher = watcher;
+        _weatherService = weatherService;
+        _releaseService = releaseService;
+        _taskbarTweaksService = taskbarTweaksService;
+        _overlayCoordinator = overlayCoordinator;
 
         Settings = _db.LoadSettings();
+
+        WidgetStudio = new WidgetStudioViewModel(
+            _db,
+            packageService,
+            marketplaceProvider,
+            _overlayCoordinator,
+            SetStatus,
+            () => Profiles?.ReloadProfilesAndPalettes());
+
+        Profiles = new ProfilesViewModel(
+            _db,
+            colorAnalyzer,
+            packageService,
+            _overlayCoordinator,
+            GetCurrentTopologyKey,
+            profile =>
+            {
+                WidgetStudio.BindActiveProfile(profile);
+                GlassmorphismStyle preset = GlassmorphismStyle.GetPreset(profile.GlassPresetName);
+                WidgetStudio.ApplyGlobalGlassFromExternal(preset, persistToProfile: false);
+                _overlayCoordinator.UpdateConfiguration(
+                    Settings,
+                    Monitors.Select(m => m.Model).ToList(),
+                    profile,
+                    WidgetStudio.LiveGlassStyle);
+            },
+            suggestedGlass =>
+            {
+                WidgetStudio.ApplyGlobalGlassFromExternal(suggestedGlass, persistToProfile: true);
+            },
+            SetStatus);
+
+        LiveWallpaper = new LiveWallpaperViewModel(
+            youtubeService,
+            _db,
+            _overlayCoordinator,
+            StageVideoInPlacementStudio,
+            SetStatus,
+            () => CurrentPlan,
+            () => BackgroundColorHex,
+            RefreshLocalLibrary);
+
+        TaskbarTweaks = new TaskbarTweaksViewModel(
+            _db,
+            _taskbarTweaksService,
+            () => WidgetStudio.LiveGlassStyle,
+            SetStatus);
+
+        WidgetStudio.PreviewSurfaceInvalidated += () => TaskbarTweaks.RefreshGlassThemeChanged();
+
+        _overlayCoordinator.WidgetBoundsUpdatedFromDesktop += w => WidgetStudio.NotifyDesktopWidgetBoundsChanged(w);
+        _overlayCoordinator.AutoProfileActivated += (prof, res) =>
+        {
+            Profiles.HandleAutoProfileSwitched(prof, res.MatchReason);
+            WidgetStudio.BindActiveProfile(prof);
+        };
+        _overlayCoordinator.StatusMessageRaised += msg => SetStatus(msg, isError: false);
+
         SyncPropertiesFromSettings();
 
         _watcher.DisplayConfigurationStabilized += async (_, _) => await OnDisplayTopologyChangedAsync();
@@ -173,8 +283,11 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (lastItem != null)
         {
             var card = new WallpaperCardViewModel(lastItem);
-            await card.EnsureThumbnailLoadedAsync(_galleryProvider, Settings.ThumbnailCacheDirectory);
-            await card.EnsurePreviewLoadedAsync(Settings.ThumbnailCacheDirectory);
+            if (!isStartupApplyMode)
+            {
+                await card.EnsureThumbnailLoadedAsync(_galleryProvider, Settings.ThumbnailCacheDirectory);
+                await card.EnsurePreviewLoadedAsync(Settings.ThumbnailCacheDirectory);
+            }
             ActiveAppliedWallpaper = card;
             StageWallpaper(card, loadProfile: true);
         }
@@ -182,6 +295,37 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (isStartupApplyMode && lastItem != null && lastItem.IsDownloaded)
         {
             await ApplyWallpaperAsync();
+            ImageCacheHelper.ClearMemoryCache();
+            if (!AutoReapplyOnDisplayChange)
+            {
+                Application.Current.Shutdown(0);
+                return;
+            }
+        }
+
+        Profiles.Initialize(Settings);
+        var activeProfile = Profiles.GetActiveProfile();
+        _overlayCoordinator.RefreshWallpaperCache(Monitors.Select(m => m.Model).ToList());
+        await WidgetStudio.InitializeAsync(Settings, activeProfile);
+
+        // Live Wallpaper tab removed per user request; clear any active live video overlay at startup
+        if (!string.IsNullOrWhiteSpace(Settings.ActiveLiveVideoPath))
+        {
+            Settings.ActiveLiveVideoPath = null;
+            _db.SaveSettings(Settings);
+        }
+
+        _overlayCoordinator.Initialize(
+            Settings,
+            Monitors.Select(m => m.Model).ToList(),
+            activeProfile,
+            WidgetStudio.LiveGlassStyle);
+
+        WidgetStudio.RefreshWallpaperPreviewBackdrop(Settings.LastAppliedImagePath);
+        TaskbarTweaks.Initialize(Settings);
+
+        if (isStartupApplyMode)
+        {
             return;
         }
 
@@ -202,6 +346,24 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         PhysicalAlignment = Settings.DefaultPhysicalAlignment;
         EnableBezelCompensation = Settings.DefaultBezelCompensation;
         ShowMonitorLabels = Settings.ShowMonitorLabelsInPreview;
+
+        EnableDesktopWidgets = Settings.EnableDesktopWidgets;
+        WeatherCity = Settings.WeatherCity;
+        WeatherUseFahrenheit = Settings.WeatherUseFahrenheit;
+        CustomWeatherApiKey = Settings.CustomWeatherApiKey ?? string.Empty;
+        GitHubRepositorySlug = string.IsNullOrWhiteSpace(Settings.GitHubRepositorySlug)
+            ? GitHubReleaseService.DefaultRepoSlug
+            : Settings.GitHubRepositorySlug;
+        LatestReleasePageUrl = $"https://github.com/{GitHubRepositorySlug}/releases";
+
+        _suppressGallerySourceSync = true;
+        CustomGallerySiteUrl = Settings.CustomGallerySiteUrl ?? string.Empty;
+        _customSiteProvider.CustomSiteUrl = CustomGallerySiteUrl;
+        SelectedGallerySource = string.Equals(Settings.PreferredGallerySource, "CustomWebsite", StringComparison.OrdinalIgnoreCase)
+            ? "Custom Website"
+            : "UltraWideWallpapers.net";
+        _suppressGallerySourceSync = false;
+
         _suppressPlanRecompute = false;
     }
 
@@ -272,6 +434,61 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     public void StageWallpaper(WallpaperCardViewModel card, bool loadProfile = true)
     {
+        if (WallpaperCardViewModel.IsVideoFile(card.Model.LocalOriginalPath) && File.Exists(card.Model.LocalOriginalPath))
+        {
+            StageVideoInPlacementStudio(card.Model.LocalOriginalPath!, card.Model.LocalThumbnailPath);
+            return;
+        }
+        IsVideoWallpaperStaged = false;
+        _stagedLiveVideoPath = null;
+        StageWallpaperCore(card, loadProfile);
+    }
+
+    public void StageVideoInPlacementStudio(string videoPath, string? stillImagePath)
+    {
+        if (string.IsNullOrWhiteSpace(videoPath) || !File.Exists(videoPath)) return;
+
+        int vw = 3840, vh = 1600;
+        if (!string.IsNullOrWhiteSpace(stillImagePath) && File.Exists(stillImagePath))
+        {
+            var dims = SkiaWallpaperCompositor.ReadImageDimensions(stillImagePath);
+            if (dims.Width > 0 && dims.Height > 0)
+            {
+                vw = dims.Width;
+                vh = dims.Height;
+            }
+        }
+
+        string vidId = $"livevideo:{Path.GetFileName(videoPath)}";
+        var item = new WallpaperItem
+        {
+            Id = vidId,
+            Title = Path.GetFileNameWithoutExtension(videoPath),
+            FileName = Path.GetFileName(videoPath),
+            Width = vw,
+            Height = vh,
+            LocalOriginalPath = stillImagePath,
+            PreviewUrl = stillImagePath ?? string.Empty
+        };
+
+        var card = new WallpaperCardViewModel(item);
+        _stagedLiveVideoPath = videoPath;
+        IsVideoWallpaperStaged = true;
+        StageWallpaperCore(card, loadProfile: true);
+        CurrentPageIndex = 2; // Placement Studio
+    }
+
+    [RelayCommand]
+    private void ExitVideoStaging()
+    {
+        IsVideoWallpaperStaged = false;
+        _stagedLiveVideoPath = null;
+        if (ActiveAppliedWallpaper != null)
+            StageWallpaperCore(ActiveAppliedWallpaper, loadProfile: true);
+    }
+
+    private void StageWallpaperCore(WallpaperCardViewModel card, bool loadProfile)
+    {
         StagedWallpaper = card;
         StagedPreviewSource = card.BestPreviewSource;
 
@@ -305,6 +522,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         CropTop = s.CropTop;
         CropRight = s.CropRight;
         CropBottom = s.CropBottom;
+        FlipHorizontal = s.FlipHorizontal;
+        FlipVertical = s.FlipVertical;
         BackgroundColorHex = s.BackgroundColorHex;
         _individualAssignments.Clear();
         foreach (var kv in s.PerMonitorAssignments)
@@ -330,7 +549,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             CropTop = CropTop,
             CropRight = CropRight,
             CropBottom = CropBottom,
-            BackgroundColorHex = BackgroundColorHex
+            FlipHorizontal = FlipHorizontal,
+            FlipVertical = FlipVertical,
+            BackgroundColorHex = NormalizedBackgroundBrushHex
         };
 
         foreach (var kv in _individualAssignments)
@@ -388,6 +609,45 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         Zoom = Math.Clamp(Zoom + delta, 0.25, 4.0);
     }
 
+    public void UpdateTransform(double zoom, double panX, double panY)
+    {
+        _suppressPlanRecompute = true;
+        Zoom = Math.Clamp(zoom, 0.25, 4.0);
+        PanX = Math.Clamp(panX, -1.5, 1.5);
+        PanY = Math.Clamp(panY, -1.5, 1.5);
+        _suppressPlanRecompute = false;
+        RecomputePlan();
+    }
+
+    public void ScheduleStudioWallpaperApply(int delayMs = 100)
+    {
+        if (!AutoApplyStudioChanges || StagedWallpaper == null)
+            return;
+        if (!StagedWallpaper.Model.IsDownloaded && StagedWallpaper.Model.RequiresAuthentication)
+            return;
+
+        _studioApplyDebounceCts?.Cancel();
+        _studioApplyDebounceCts?.Dispose();
+        var cts = new CancellationTokenSource();
+        _studioApplyDebounceCts = cts;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                await Task.Delay(Math.Max(20, delayMs), cts.Token);
+                if (cts.IsCancellationRequested) return;
+                await System.Windows.Application.Current.Dispatcher.InvokeAsync(async () =>
+                {
+                    if (cts.IsCancellationRequested || IsApplying || StagedWallpaper == null)
+                        return;
+                    await ApplyWallpaperAsync();
+                });
+            }
+            catch (OperationCanceledException) { }
+        });
+    }
+
     [RelayCommand]
     public void ResetPlacement()
     {
@@ -401,10 +661,18 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         CropTop = 0.0;
         CropRight = 0.0;
         CropBottom = 0.0;
+        FlipHorizontal = false;
+        FlipVertical = false;
         _suppressPlanRecompute = false;
         RecomputePlan();
         SetStatus("Positioning reset to automatic fit.", isError: false);
     }
+
+    [RelayCommand]
+    public void ToggleFlipHorizontal() => FlipHorizontal = !FlipHorizontal;
+
+    [RelayCommand]
+    public void ToggleFlipVertical() => FlipVertical = !FlipVertical;
 
     [RelayCommand]
     public void SavePlacementPreferences()
@@ -422,7 +690,87 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             _db.SavePlacementProfile(key, placement);
         }
 
-        SetStatus("Placement preferences saved for this wallpaper & monitor layout.", isError: false);
+        // Export portable backup containing both Placement settings and Widgets
+        var backup = new DuoWallLayoutPresetBackup
+        {
+            PresetName = StagedWallpaper?.Title ?? "DuoWall Layout Backup",
+            WallpaperFilePath = StagedWallpaper?.Model.LocalOriginalPath ?? Settings.LastAppliedImagePath,
+            LiveVideoPath = IsVideoWallpaperStaged ? _stagedLiveVideoPath : Settings.ActiveLiveVideoPath,
+            LiveVideoStillPath = IsVideoWallpaperStaged ? StagedWallpaper?.Model.LocalOriginalPath : Settings.ActiveLiveVideoStillPath,
+            ActiveGlassPresetId = Settings.ActiveGlassPresetId,
+            WidgetAccentColorHex = WidgetStudio.WidgetAccentColorHex,
+            AutoWidgetAccentFromWallpaper = WidgetStudio.AutoAccentFromWallpaper,
+            Placement = placement.Clone(),
+            Widgets = WidgetStudio.Widgets.Select(w => w.Clone()).ToList()
+        };
+
+        var dlg = new SaveFileDialog
+        {
+            Title = "Save Placement & Widgets Preset Backup",
+            Filter = "DuoWall Preset Backup (*.duowall-preset;*.json)|*.duowall-preset;*.json",
+            DefaultExt = ".duowall-preset",
+            FileName = $"{YouTubeWallpaperService.SanitizeName(backup.PresetName)}.duowall-preset"
+        };
+
+        if (dlg.ShowDialog() == true)
+        {
+            string json = JsonSerializer.Serialize(backup, new JsonSerializerOptions
+            {
+                WriteIndented = true,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            });
+            File.WriteAllText(dlg.FileName, json);
+            SetStatus($"Saved preferences & exported preset backup ({backup.Widgets.Count} widget(s)) to '{Path.GetFileName(dlg.FileName)}'.", isError: false);
+        }
+        else
+        {
+            SetStatus("Placement preferences saved for this wallpaper & monitor layout.", isError: false);
+        }
+    }
+
+    [RelayCommand]
+    public async Task ImportLayoutPresetAsync()
+    {
+        var dlg = new OpenFileDialog
+        {
+            Title = "Import DuoWall Placement & Widgets Preset Backup",
+            Filter = "DuoWall Preset Backup (*.duowall-preset;*.json)|*.duowall-preset;*.json"
+        };
+        if (dlg.ShowDialog() != true) return;
+
+        try
+        {
+            string json = await File.ReadAllTextAsync(dlg.FileName);
+            var backup = JsonSerializer.Deserialize<DuoWallLayoutPresetBackup>(json, new JsonSerializerOptions
+            {
+                PropertyNameCaseInsensitive = true
+            });
+            if (backup == null)
+            {
+                SetStatus("Selected preset backup file is empty or invalid.", isError: true);
+                return;
+            }
+
+            if (!string.IsNullOrWhiteSpace(backup.LiveVideoPath) && File.Exists(backup.LiveVideoPath))
+            {
+                StageVideoInPlacementStudio(backup.LiveVideoPath, backup.LiveVideoStillPath);
+            }
+            else if (!string.IsNullOrWhiteSpace(backup.WallpaperFilePath) && File.Exists(backup.WallpaperFilePath) && !WallpaperCardViewModel.IsVideoFile(backup.WallpaperFilePath))
+            {
+                var imported = await _libraryService.ImportLocalImageAsync(backup.WallpaperFilePath, DownloadDirectory);
+                var card = new WallpaperCardViewModel(imported);
+                await card.EnsureThumbnailLoadedAsync(_galleryProvider, Settings.ThumbnailCacheDirectory);
+                StageWallpaper(card, loadProfile: false);
+            }
+
+            ApplyPlacementSettingsToViewModel(backup.Placement);
+            WidgetStudio.RestoreLayoutPresetBackup(backup);
+            SetStatus($"Imported preset '{backup.PresetName}' with {backup.Widgets.Count} widget(s). Click Apply Wallpaper to push to desktop.", isError: false);
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Failed to import preset backup: {ex.Message}", isError: true);
+        }
     }
 
     [RelayCommand]
@@ -474,13 +822,58 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             var card = StagedWallpaper;
             var item = card.Model;
 
+            // Live Video Wallpaper framing branch from Placement Studio
+            if (IsVideoWallpaperStaged && !string.IsNullOrWhiteSpace(_stagedLiveVideoPath) && File.Exists(_stagedLiveVideoPath))
+            {
+                ApplyProgress = 0.45;
+                ApplyProgressMessage = "Mapping live video geometry across connected displays...";
+                var vidMonitors = Monitors.Select(m => m.Model).ToList();
+                var vidPlacement = BuildPlacementSettings();
+                string stillPath = item.LocalOriginalPath ?? string.Empty;
+                int vw = item.Width > 0 ? item.Width : 3840;
+                int vh = item.Height > 0 ? item.Height : 2160;
+                var vidPlan = _geometryEngine.ComputePlan(vidMonitors, vw, vh, stillPath, vidPlacement);
+                CurrentPlan = vidPlan;
+                ResolutionAdvisory = vidPlan.ResolutionAdvisory;
+
+                string vidProfileKey = WallpaperLibraryService.BuildProfileKey(item.Id, GetCurrentTopologyKey());
+                _db.SavePlacementProfile(vidProfileKey, vidPlacement);
+
+                Settings.ActiveLiveVideoPath = _stagedLiveVideoPath;
+                Settings.ActiveLiveVideoStillPath = stillPath;
+                Settings.ActiveLiveVideoPlacementKey = vidProfileKey;
+                _db.SaveSettings(Settings);
+
+                ApplyProgress = 0.90;
+                ApplyProgressMessage = "Applying framed live video wallpaper...";
+                _overlayCoordinator.ApplyLiveVideoWallpaper(_stagedLiveVideoPath, vidPlan, vidPlacement.BackgroundColorHex);
+                LiveWallpaper.RefreshActiveVideoBanner();
+                WidgetStudio.RefreshWallpaperPreviewBackdrop(stillPath ?? Settings.LastAppliedImagePath);
+                if (!string.IsNullOrWhiteSpace(stillPath) && File.Exists(stillPath))
+                    WidgetStudio.SyncWallpaperAccentIfAuto(stillPath);
+
+                ApplyProgress = 1.0;
+                ApplyProgressMessage = "Live Video Applied!";
+                SetStatus($"Applied Live Video '{item.Title}' with your Placement Studio crop, zoom, flip & gap fill across {vidMonitors.Count} monitor(s).", isError: false);
+                return;
+            }
+
+            // Static wallpaper flow: clear active video overlay so static wallpaper is clearly visible
+            if (!string.IsNullOrWhiteSpace(Settings.ActiveLiveVideoPath))
+            {
+                Settings.ActiveLiveVideoPath = null;
+                _overlayCoordinator.ApplyLiveVideoWallpaper(null, null, null);
+                LiveWallpaper.RefreshActiveVideoBanner();
+            }
+
             // Step 1 & 2: Download highest suitable original if online, never overwriting original
             ApplyProgressMessage = item.IsDownloaded
                 ? "Using local high-resolution original..."
                 : "Downloading full-resolution wallpaper from UltraWideWallpapers.net...";
 
+            var progProvider = GetActiveGalleryProvider();
             var progress = new Progress<double>(p => ApplyProgress = 0.1 + p * 0.5);
-            var dl = await _libraryService.EnsureLocalOriginalAsync(item, DownloadDirectory, progress);
+            var dl = await _libraryService.EnsureLocalOriginalAsync(item, DownloadDirectory, progress, overrideProvider: progProvider);
 
             if (!dl.Success || string.IsNullOrWhiteSpace(dl.LocalFilePath))
             {
@@ -556,7 +949,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             // Step 7: Persist state & update UI
             item.LastAppliedUtc = DateTime.UtcNow;
             _db.UpsertWallpaper(item);
-            string profileKey = WallpaperLibraryService.BuildProfileKey(item.Id, _liveTopologySignature);
+            string profileKey = WallpaperLibraryService.BuildProfileKey(item.Id, GetCurrentTopologyKey());
             _db.SavePlacementProfile(profileKey, placement);
 
             Settings.LastAppliedWallpaperId = item.Id;
@@ -567,6 +960,12 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             ActiveAppliedWallpaper = card;
             RefreshLocalLibrary();
             RefreshCacheMetrics();
+
+            _overlayCoordinator.RefreshWallpaperCache(Monitors.Select(m => m.Model).ToList());
+            WidgetStudio.RefreshWallpaperPreviewBackdrop(dl.LocalFilePath);
+            WidgetStudio.SyncWallpaperAccentIfAuto(dl.LocalFilePath);
+            Profiles.HandleWallpaperApplied(dl.LocalFilePath);
+            _overlayCoordinator.UpdateGlobalGlassLive(WidgetStudio.LiveGlassStyle, Profiles.GetActiveProfile()?.WidgetBrightness ?? 1.0);
 
             ApplyProgress = 1.0;
             ApplyProgressMessage = "Applied!";
@@ -638,6 +1037,43 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
     }
 
+    private IWallpaperSourceProvider GetActiveGalleryProvider() =>
+        string.Equals(SelectedGallerySource, "Custom Website", StringComparison.OrdinalIgnoreCase)
+            ? _customSiteProvider
+            : _galleryProvider;
+
+    [RelayCommand]
+    public async Task LinkCustomWebsiteAsync()
+    {
+        string normalized = CustomWebsiteGalleryProvider.NormalizeUrl(CustomGallerySiteUrl);
+        if (string.IsNullOrWhiteSpace(normalized))
+        {
+            SetStatus("Please enter a valid wallpaper website URL starting with https:// or http://.", isError: true);
+            return;
+        }
+
+        CustomGallerySiteUrl = normalized;
+        _customSiteProvider.CustomSiteUrl = normalized;
+        Settings.CustomGallerySiteUrl = normalized;
+        Settings.PreferredGallerySource = "CustomWebsite";
+        _db.SaveSettings(Settings);
+
+        _suppressGallerySourceSync = true;
+        SelectedGallerySource = "Custom Website";
+        _suppressGallerySourceSync = false;
+
+        await LoadGalleryAsync(reset: true);
+    }
+
+    partial void OnSelectedGallerySourceChanged(string value)
+    {
+        if (_suppressGallerySourceSync) return;
+        bool isCustom = string.Equals(value, "Custom Website", StringComparison.OrdinalIgnoreCase);
+        Settings.PreferredGallerySource = isCustom ? "CustomWebsite" : "UltraWideWallpapers";
+        _db.SaveSettings(Settings);
+        _ = LoadGalleryAsync(reset: true);
+    }
+
     // ==================== GALLERY COMMANDS ====================
 
     [RelayCommand]
@@ -657,8 +1093,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         if (!HasMoreGalleryItems && !reset)
             return;
 
+        var activeProvider = GetActiveGalleryProvider();
         IsLoadingGallery = true;
-        GalleryStatusText = "Loading wallpapers from UltraWideWallpapers.net...";
+        GalleryStatusText = $"Loading wallpapers from {activeProvider.ProviderName}...";
 
         try
         {
@@ -696,7 +1133,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
                 Limit = 24
             };
 
-            var result = await _galleryProvider.QueryGalleryAsync(query, ct);
+            var result = await activeProvider.QueryGalleryAsync(query, ct);
             if (ct.IsCancellationRequested) return;
 
             foreach (var item in result.Items)
@@ -713,14 +1150,16 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
                 var card = new WallpaperCardViewModel(item);
                 GalleryItems.Add(card);
-                _ = card.EnsureThumbnailLoadedAsync(_galleryProvider, Settings.ThumbnailCacheDirectory, ct);
+                _ = card.EnsureThumbnailLoadedAsync(activeProvider, Settings.ThumbnailCacheDirectory, ct);
             }
 
             _galleryOffset += result.Items.Count;
             HasMoreGalleryItems = result.HasMore;
-            GalleryStatusText = result.TotalKnownCount > 0
-                ? $"Showing {GalleryItems.Count} of {result.TotalKnownCount:N0} wallpapers · UltraWideWallpapers.net"
-                : $"Showing {GalleryItems.Count} wallpapers";
+            GalleryStatusText = !string.IsNullOrWhiteSpace(result.StatusMessage) && result.Items.Count == 0
+                ? result.StatusMessage!
+                : result.TotalKnownCount > 0
+                    ? $"Showing {GalleryItems.Count} of {result.TotalKnownCount:N0} wallpapers · {activeProvider.ProviderName}"
+                    : $"Showing {GalleryItems.Count} wallpapers · {activeProvider.ProviderName}";
         }
         catch (OperationCanceledException) { }
         catch (Exception ex)
@@ -745,6 +1184,33 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         if (!string.IsNullOrWhiteSpace(hex))
             BackgroundColorHex = hex;
+    }
+
+    [RelayCommand]
+    public async Task SampleEdgeBackgroundColorAsync()
+    {
+        if (StagedWallpaper == null) return;
+        try
+        {
+            string? localPath = StagedWallpaper.Model.LocalOriginalPath;
+            if (string.IsNullOrWhiteSpace(localPath) || !File.Exists(localPath))
+            {
+                localPath = StagedWallpaper.Model.LocalThumbnailPath;
+                if (string.IsNullOrWhiteSpace(localPath) || !File.Exists(localPath))
+                    localPath = await _galleryProvider.GetOrCacheThumbnailAsync(StagedWallpaper.Model, Settings.ThumbnailCacheDirectory);
+            }
+
+            if (!string.IsNullOrWhiteSpace(localPath) && File.Exists(localPath))
+            {
+                string hex = await Task.Run(() => SkiaWallpaperCompositor.SampleAverageEdgeHex(localPath));
+                BackgroundColorHex = hex;
+                SetStatus($"Matched plain background fill to wallpaper edge color ({hex}).", isError: false);
+            }
+        }
+        catch (Exception ex)
+        {
+            SetStatus($"Could not sample wallpaper edge color: {ex.Message}", isError: true);
+        }
     }
 
     [RelayCommand]
@@ -781,10 +1247,15 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         try
         {
             var prog = new Progress<double>(p => card.DownloadProgress = p);
-            var res = await _libraryService.EnsureLocalOriginalAsync(card.Model, DownloadDirectory, prog);
+            var activeProvider = card.SourceProvider.StartsWith("Custom Site", StringComparison.OrdinalIgnoreCase)
+                ? _customSiteProvider
+                : GetActiveGalleryProvider();
+            var res = await _libraryService.EnsureLocalOriginalAsync(card.Model, DownloadDirectory, prog, overrideProvider: activeProvider);
             if (res.Success)
             {
                 card.RefreshFromModel();
+                if (StagedWallpaper != null && string.Equals(StagedWallpaper.Id, card.Id, StringComparison.OrdinalIgnoreCase))
+                    StagedPreviewSource = card.BestPreviewSource;
                 RefreshLocalLibrary();
                 RefreshCacheMetrics();
                 SetStatus($"Downloaded '{card.Title}' ({res.Width}×{res.Height}) to {DownloadDirectory}.", isError: false);
@@ -904,20 +1375,61 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     {
         var dlg = new OpenFileDialog
         {
-            Title = "Import Local Wallpaper",
+            Title = "Upload Own Photo / Local Wallpaper",
             Filter = "Image Files (*.jpg;*.jpeg;*.png;*.webp;*.bmp)|*.jpg;*.jpeg;*.png;*.webp;*.bmp"
         };
         if (dlg.ShowDialog() != true) return;
 
         try
         {
+            var (imgW, imgH) = SkiaWallpaperCompositor.ReadImageDimensions(dlg.FileName);
+            var activeMonitors = Monitors.Where(m => m.Model.IsConnected && m.IsIncluded).Select(m => m.Model).ToList();
+            if (activeMonitors.Count == 0) activeMonitors = Monitors.Select(m => m.Model).ToList();
+
+            bool lowResConfirmApply = false;
+            if (activeMonitors.Count > 0 && imgW > 0 && imgH > 0)
+            {
+                int minX = activeMonitors.Min(m => m.Bounds.X);
+                int minY = activeMonitors.Min(m => m.Bounds.Y);
+                int maxX = activeMonitors.Max(m => m.Bounds.Right);
+                int maxY = activeMonitors.Max(m => m.Bounds.Bottom);
+                int requiredW = maxX - minX;
+                int requiredH = maxY - minY;
+
+                if (imgW < requiredW * 0.90 || imgH < requiredH * 0.90)
+                {
+                    var answer = MessageBox.Show(
+                        $"This photo ({imgW} × {imgH} px) is smaller than your combined multi-monitor resolution ({requiredW} × {requiredH} px).\n\n" +
+                        "Stretching or spanning a smaller photo across multiple monitors may reduce sharpness.\n\n" +
+                        "Do you still want to upload and apply this low-resolution image?",
+                        "Low-Resolution Image Warning · DuoWall by SRMD",
+                        MessageBoxButton.YesNo,
+                        MessageBoxImage.Warning);
+
+                    if (answer != MessageBoxResult.Yes)
+                    {
+                        SetStatus($"Canceled uploading low-resolution image ({imgW}×{imgH}).", isError: false);
+                        return;
+                    }
+                    lowResConfirmApply = true;
+                }
+            }
+
             var imported = await _libraryService.ImportLocalImageAsync(dlg.FileName, DownloadDirectory);
             var card = new WallpaperCardViewModel(imported);
             await card.EnsureThumbnailLoadedAsync(_galleryProvider, Settings.ThumbnailCacheDirectory);
             RefreshLocalLibrary();
             StageWallpaper(card, loadProfile: false);
-            CurrentPageIndex = 2; // Studio
-            SetStatus($"Imported '{imported.Title}' ({imported.Width}×{imported.Height}).", isError: false);
+            CurrentPageIndex = 2; // Placement Studio
+
+            if (lowResConfirmApply)
+            {
+                await ApplyWallpaperAsync();
+            }
+            else
+            {
+                SetStatus($"Uploaded '{imported.Title}' ({imported.Width}×{imported.Height}) and opened in Placement Studio.", isError: false);
+            }
         }
         catch (Exception ex)
         {
@@ -972,9 +1484,109 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     }
 
     [RelayCommand]
-    public void CheckForUpdates()
+    public async Task SyncWeatherNowAsync()
     {
-        SetStatus("DuoWall by SRMD v1.0.0 is up to date (Release Build).", isError: false);
+        Settings.WeatherCity = string.IsNullOrWhiteSpace(WeatherCity) ? "Lahore" : WeatherCity.Trim();
+        Settings.WeatherUseFahrenheit = WeatherUseFahrenheit;
+        Settings.CustomWeatherApiKey = string.IsNullOrWhiteSpace(CustomWeatherApiKey) ? null : CustomWeatherApiKey.Trim();
+        _db.SaveSettings(Settings);
+
+        await _overlayCoordinator.RefreshWeatherAsync();
+        if (_overlayCoordinator.LatestWeather is { } wx)
+        {
+            SetStatus($"Weather synced for {wx.CityDisplay}: {wx.Temperature:0.#}{wx.UnitSymbol} ({wx.ConditionText}) via {wx.ProviderName}.", isError: false);
+        }
+        else
+        {
+            SetStatus(_overlayCoordinator.WeatherStatus, isError: true);
+        }
+    }
+
+    [RelayCommand]
+    public void ShowAboutMe()
+    {
+        var aboutWindow = new AboutMeDialogWindow
+        {
+            Owner = Application.Current?.MainWindow
+        };
+        aboutWindow.ShowDialog();
+    }
+
+    [RelayCommand]
+    public async Task CheckForUpdatesAsync()
+    {
+        Settings.GitHubRepositorySlug = string.IsNullOrWhiteSpace(GitHubRepositorySlug)
+            ? GitHubReleaseService.DefaultRepoSlug
+            : GitHubRepositorySlug.Trim();
+        _db.SaveSettings(Settings);
+
+        SetStatus("Checking official GitHub Releases for newer DuoWall versions...", isError: false);
+        var result = await _releaseService.CheckLatestReleaseAsync("2.0.0", Settings.GitHubRepositorySlug);
+        if (!string.IsNullOrWhiteSpace(result.ReleasePageUrl))
+        {
+            LatestReleasePageUrl = result.ReleasePageUrl;
+        }
+        SetStatus(result.Message, isError: !result.Success);
+
+        if (result.UpdateAvailable)
+        {
+            var msg = $"A newer version of DuoWall is available: v{result.LatestVersion}!\n\nCurrent version: v2.0.0\n\nWould you like to open the GitHub Releases page to view notes and download?";
+            if (MessageBox.Show(msg, "DuoWall - Update Available", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
+            {
+                OpenReleasePage();
+            }
+        }
+        else if (result.Success)
+        {
+            MessageBox.Show($"You are using the latest version of DuoWall (v2.0.0).\n\nYour installation is up to date!", "DuoWall - Up to Date", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        else
+        {
+            MessageBox.Show($"Unable to check for updates right now: {result.Message}\n\nYou can check releases directly at:\nhttps://github.com/{Settings.GitHubRepositorySlug}/releases", "DuoWall - Update Check", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    [RelayCommand]
+    public void OpenReleasePage()
+    {
+        if (!string.IsNullOrWhiteSpace(LatestReleasePageUrl))
+        {
+            OpenUrlInBrowser(LatestReleasePageUrl);
+        }
+    }
+
+    partial void OnEnableDesktopWidgetsChanged(bool value)
+    {
+        Settings.EnableDesktopWidgets = value;
+        _db.SaveSettings(Settings);
+        WidgetStudio.EnableDesktopWidgets = value;
+        _overlayCoordinator.RebuildOverlays();
+    }
+
+    partial void OnWeatherCityChanged(string value)
+    {
+        Settings.WeatherCity = string.IsNullOrWhiteSpace(value) ? "Lahore" : value.Trim();
+        _db.SaveSettings(Settings);
+    }
+
+    partial void OnWeatherUseFahrenheitChanged(bool value)
+    {
+        Settings.WeatherUseFahrenheit = value;
+        _db.SaveSettings(Settings);
+        _ = _overlayCoordinator.RefreshWeatherAsync();
+    }
+
+    partial void OnCustomWeatherApiKeyChanged(string value)
+    {
+        Settings.CustomWeatherApiKey = string.IsNullOrWhiteSpace(value) ? null : value.Trim();
+        _db.SaveSettings(Settings);
+    }
+
+    partial void OnGitHubRepositorySlugChanged(string value)
+    {
+        Settings.GitHubRepositorySlug = string.IsNullOrWhiteSpace(value) ? GitHubReleaseService.DefaultRepoSlug : value.Trim();
+        LatestReleasePageUrl = $"https://github.com/{Settings.GitHubRepositorySlug}/releases";
+        _db.SaveSettings(Settings);
     }
 
     public void RefreshCacheMetrics()
@@ -1026,7 +1638,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
     private string GetCurrentTopologyKey()
     {
-        return string.Join("|", Monitors.Select(m => $"{m.Id}:{m.Model.Bounds.Width}x{m.Model.Bounds.Height}"));
+        if (!IsSimulatedTopology && !string.IsNullOrWhiteSpace(_liveTopologySignature))
+            return _liveTopologySignature;
+        return Win32DisplayDetector.ComputeTopologySignature(Monitors.Select(m => m.Model).ToList());
     }
 
     private void SetStatus(string message, bool isError)
@@ -1069,7 +1683,48 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     partial void OnCropTopChanged(double value) => RecomputePlan();
     partial void OnCropRightChanged(double value) => RecomputePlan();
     partial void OnCropBottomChanged(double value) => RecomputePlan();
-    partial void OnBackgroundColorHexChanged(string value) => RecomputePlan();
+    partial void OnFlipHorizontalChanged(bool value) => RecomputePlan();
+    partial void OnFlipVerticalChanged(bool value) => RecomputePlan();
+
+    partial void OnBackgroundColorHexChanged(string value)
+    {
+        if (!_suppressRgbSync && TryParseHexRgb(value, out byte r, out byte g, out byte b))
+        {
+            _suppressRgbSync = true;
+            BgRed = r;
+            BgGreen = g;
+            BgBlue = b;
+            NormalizedBackgroundBrushHex = $"#{r:X2}{g:X2}{b:X2}";
+            _suppressRgbSync = false;
+        }
+        RecomputePlan();
+    }
+
+    partial void OnBgRedChanged(byte value) => SyncHexFromRgb();
+    partial void OnBgGreenChanged(byte value) => SyncHexFromRgb();
+    partial void OnBgBlueChanged(byte value) => SyncHexFromRgb();
+
+    private void SyncHexFromRgb()
+    {
+        if (_suppressRgbSync) return;
+        _suppressRgbSync = true;
+        string hex = $"#{BgRed:X2}{BgGreen:X2}{BgBlue:X2}";
+        NormalizedBackgroundBrushHex = hex;
+        BackgroundColorHex = hex;
+        _suppressRgbSync = false;
+        RecomputePlan();
+    }
+
+    private static bool TryParseHexRgb(string? hex, out byte r, out byte g, out byte b)
+    {
+        r = g = b = 0;
+        if (string.IsNullOrWhiteSpace(hex)) return false;
+        string clean = hex.Trim().TrimStart('#');
+        if (clean.Length != 6) return false;
+        return byte.TryParse(clean[0..2], System.Globalization.NumberStyles.HexNumber, null, out r) &&
+               byte.TryParse(clean[2..4], System.Globalization.NumberStyles.HexNumber, null, out g) &&
+               byte.TryParse(clean[4..6], System.Globalization.NumberStyles.HexNumber, null, out b);
+    }
 
     partial void OnShowMonitorLabelsChanged(bool value)
     {
@@ -1201,6 +1856,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         _galleryCts?.Dispose();
         _searchDebounceCts?.Cancel();
         _searchDebounceCts?.Dispose();
+        _customSiteProvider.Dispose();
+        _taskbarTweaksService.Dispose();
         _watcher.Dispose();
     }
 }
