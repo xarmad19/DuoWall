@@ -325,3 +325,4 @@ public sealed class SystemTrayManager : IDisposable
         RemoveIcon();
     }
 }
+

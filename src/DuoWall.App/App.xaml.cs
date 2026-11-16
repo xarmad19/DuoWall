@@ -45,72 +45,82 @@ public partial class App : Application
                 LogCrash(ex);
         };
 
-        // Single instance check: if another instance is already running, signal it and exit immediately
-        bool isFirstInstance;
-        try
-        {
-            _singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out isFirstInstance);
-        }
-        catch
-        {
-            isFirstInstance = false;
-        }
+        bool isCliTool = e.Args.Any(a =>
+            string.Equals(a, "--capture-screenshots", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(a, "--diagnostics", StringComparison.OrdinalIgnoreCase));
 
-        if (!isFirstInstance)
+        // Single instance check: if another instance is already running, signal it and exit immediately
+        bool isFirstInstance = true;
+        if (!isCliTool)
         {
             try
             {
-                using var showEvent = EventWaitHandle.OpenExisting(SingleInstanceEventName);
-                showEvent.Set();
+                _singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out isFirstInstance);
             }
-            catch { }
+            catch
+            {
+                isFirstInstance = false;
+            }
 
-            Shutdown(0);
-            return;
+            if (!isFirstInstance)
+            {
+                try
+                {
+                    using var showEvent = EventWaitHandle.OpenExisting(SingleInstanceEventName);
+                    showEvent.Set();
+                }
+                catch { }
+
+                Shutdown(0);
+                return;
+            }
         }
 
         // Primary instance: listen for wake signals from subsequent launches
-        try
+        if (!isCliTool)
         {
-            _singleInstanceEvent = new EventWaitHandle(false, EventResetMode.AutoReset, SingleInstanceEventName);
-            _singleInstanceThread = new Thread(() =>
+            try
             {
-                while (_singleInstanceEvent != null)
+                _singleInstanceEvent = new EventWaitHandle(false, EventResetMode.AutoReset, SingleInstanceEventName);
+                _singleInstanceThread = new Thread(() =>
                 {
-                    try
+                    while (_singleInstanceEvent != null)
                     {
-                        if (_singleInstanceEvent.WaitOne())
+                        try
                         {
-                            Current?.Dispatcher?.BeginInvoke(() =>
+                            if (_singleInstanceEvent.WaitOne())
                             {
-                                var trayMgr = _services?.GetService<SystemTrayManager>();
-                                if (trayMgr != null)
+                                Current?.Dispatcher?.BeginInvoke(() =>
                                 {
-                                    trayMgr.RestoreMainWindow();
-                                }
-                                else if (MainWindow != null)
-                                {
-                                    if (!MainWindow.IsVisible) MainWindow.Show();
-                                    if (MainWindow.WindowState == WindowState.Minimized) MainWindow.WindowState = WindowState.Normal;
-                                    MainWindow.Activate();
-                                    MainWindow.Focus();
-                                }
-                            });
+                                    var trayMgr = _services?.GetService<SystemTrayManager>();
+                                    if (trayMgr != null)
+                                    {
+                                        trayMgr.RestoreMainWindow();
+                                    }
+                                    else if (MainWindow != null)
+                                    {
+                                        if (!MainWindow.IsVisible) MainWindow.Show();
+                                        if (MainWindow.WindowState == WindowState.Minimized) MainWindow.WindowState = WindowState.Normal;
+                                        MainWindow.Activate();
+                                        MainWindow.Focus();
+                                    }
+                                });
+                            }
+                        }
+                        catch
+                        {
+                            break;
                         }
                     }
-                    catch
-                    {
-                        break;
-                    }
-                }
-            })
-            {
-                IsBackground = true,
-                Name = "DuoWall_SingleInstance_Listener"
-            };
-            _singleInstanceThread.Start();
+                })
+                {
+                    IsBackground = true,
+                    Name = "DuoWall_SingleInstance_Listener"
+                };
+                _singleInstanceThread.Start();
+            }
+            catch { }
         }
-        catch { }
 
         bool startupApply = e.Args.Any(a => string.Equals(a, "--startup-apply", StringComparison.OrdinalIgnoreCase));
         int diagIdx = Array.FindIndex(e.Args, a => string.Equals(a, "--diagnostics", StringComparison.OrdinalIgnoreCase));
@@ -167,9 +177,9 @@ public partial class App : Application
         MainWindow = mainWindow;
         mainWindow.Show();
 
-        await vm.InitializeAsync(startupApply);
-
         int shotIdx = Array.FindIndex(e.Args, a => string.Equals(a, "--capture-screenshots", StringComparison.OrdinalIgnoreCase));
+        await vm.InitializeAsync(startupApply || shotIdx >= 0);
+
         if (shotIdx >= 0)
         {
             string outDir = shotIdx + 1 < e.Args.Length ? e.Args[shotIdx + 1] : "docs/screenshots";
@@ -324,6 +334,57 @@ public partial class App : Application
             qsControl.Arrange(new Rect(0, 0, 340, 280));
             qsControl.UpdateLayout();
             SaveElementToPng(qsControl, System.IO.Path.Combine(outDir, "06_quick_settings_widget.png"), 340, 280);
+        }
+        catch { }
+
+        // 7. Typographic Clock Widget (Curated App Fonts)
+        try
+        {
+            var typoWidget = new DuoWall.Core.Widgets.WidgetInstance
+            {
+                Kind = DuoWall.Core.Widgets.WidgetKind.DigitalClock,
+                Title = "Typographic Clock",
+                Width = 520,
+                Height = 220,
+                GlassStyle = DuoWall.Core.Theming.GlassmorphismStyle.GetPreset("Mond Transparent Serif")
+            };
+            typoWidget.Config["ClockLayout"] = "Typographic Clock (Spaced Day -> Time -> Date)";
+            typoWidget.Config["FontFamily"] = "SF Pro";
+            typoWidget.Config["TimeFontFamily"] = "SF Pro";
+            typoWidget.Config["DayFontFamily"] = "SF Pro Rounded";
+            typoWidget.Config["DateFontFamily"] = "SF Compact";
+            typoWidget.Config["GreetingFontFamily"] = "Lato";
+            typoWidget.Config["CustomGreeting"] = "WEDNESDAY";
+            typoWidget.Config["Alignment"] = "Center";
+            typoWidget.Config["ClockTextShadow"] = "0.55";
+
+            var typoControl = new Controls.WidgetContentControl
+            {
+                Width = 520,
+                Height = 220
+            };
+            typoControl.Bind(typoWidget, typoWidget.GlassStyle, false);
+            typoControl.Measure(new Size(520, 220));
+            typoControl.Arrange(new Rect(0, 0, 520, 220));
+            typoControl.UpdateLayout();
+            SaveElementToPng(typoControl, System.IO.Path.Combine(outDir, "07_typographic_clock_widget.png"), 520, 220);
+        }
+        catch { }
+
+        // 8. Typographic Clock Configurator Studio
+        try
+        {
+            vm.CurrentPageIndex = 6;
+            vm.WidgetStudio.StudioSectionIndex = 0;
+            var typoInstance = vm.WidgetStudio.Widgets.FirstOrDefault(w => w.Title.Contains("Typographic", StringComparison.OrdinalIgnoreCase) || w.Kind == DuoWall.Core.Widgets.WidgetKind.DigitalClock);
+            if (typoInstance != null)
+            {
+                vm.WidgetStudio.SelectedWidget = typoInstance;
+                vm.WidgetStudio.IsWidgetConfigOpen = true;
+            }
+            window.UpdateLayout();
+            await Task.Delay(800);
+            SaveElementToPng(window, System.IO.Path.Combine(outDir, "08_typographic_clock_configurator.png"), 1360, 860);
         }
         catch { }
     }

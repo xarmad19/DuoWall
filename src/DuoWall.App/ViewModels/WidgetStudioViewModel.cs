@@ -63,7 +63,8 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
             .Select(f => f.Source)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(s => s, StringComparer.OrdinalIgnoreCase);
-        FontFamilyOptions = preferred.Concat(systemFonts).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        _allFontFamilyOptions = preferred.Concat(systemFonts).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        ActiveFontFamilyOptions = _allFontFamilyOptions;
     }
 
     public event Action? PreviewSurfaceInvalidated;
@@ -154,7 +155,9 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
     {
         "dddd, MMM d yyyy", "ddd dd MMM", "yyyy-MM-dd", "MMMM dd, yyyy", "dd/MM/yyyy"
     };
-    public IReadOnlyList<string> FontFamilyOptions { get; }
+    private readonly IReadOnlyList<string> _allFontFamilyOptions;
+    [ObservableProperty] private IReadOnlyList<string> _activeFontFamilyOptions = Array.Empty<string>();
+    public IReadOnlyList<string> FontFamilyOptions => ActiveFontFamilyOptions;
     public IReadOnlyList<string> AlignmentOptions { get; } = new[] { "Left", "Center", "Right" };
     public IReadOnlyList<string> VerticalAlignmentOptions { get; } = new[] { "Top", "Center", "Bottom" };
     public IReadOnlyList<string> AnalogDialOptions { get; } = new[] { "Minimal Ticks", "Numbers (12/3/6/9)", "Clean Dots" };
@@ -774,10 +777,15 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
         SelectedWidget.GlassStyle = mondStyle;
         SelectedWidgetPresetOverride = AllSelectableStylePresets.FirstOrDefault(p => p.Id == mondStyle.Id) ?? mondStyle;
         ConfigClockLayout = "Typographic Clock (Spaced Day -> Time -> Date)";
-        ConfigFontFamily = "Bahnschrift";
+        ConfigFontFamily = "SF Pro";
+        ConfigTimeFontFamily = "SF Pro";
+        ConfigDayFontFamily = "SF Pro Rounded";
+        ConfigDateFontFamily = "SF Compact";
+        ConfigGreetingFontFamily = "Lato";
         ConfigAlignment = "Center";
         ConfigClockTimeBaseSize = 64.0;
         if (SelectedWidgetWidth < 460) { SelectedWidgetWidth = 520; SelectedWidgetHeight = 220; }
+        UpdateActiveFontFamilyOptions();
         SyncSelectedWidgetFields();
         _setStatus("Switched selected clock to borderless Typographic Clock mode (no glass box).", false);
     }
@@ -1414,6 +1422,7 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
         ConfigGreetingUseAccent = GetBoolCfg(value, "GreetingUseAccent", false);
         ConfigGreetingColorHex = GetCfg(value, "GreetingColorHex", string.Empty);
         ConfigAnalogDialStyle = GetCfg(value, "AnalogDialStyle", "Minimal Ticks");
+        UpdateActiveFontFamilyOptions();
 
         // Shortcut / Dock Bar
         ConfigShortcutLayout = GetCfg(value, "ShortcutLayout", "Horizontal");
@@ -1544,7 +1553,46 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
         UpdateKindVisibilityFlags(SelectedWidget.Kind);
         PersistAndPushProfile();
     }
-    partial void OnConfigClockLayoutChanged(string value) => SyncSelectedWidgetFields();
+    public bool IsSelectedTypographicClock =>
+        SelectedWidget != null && (
+            SelectedWidget.Kind == WidgetKind.DigitalClock && (
+                (!string.IsNullOrEmpty(SelectedWidget.Title) && SelectedWidget.Title.Contains("Typographic", StringComparison.OrdinalIgnoreCase)) ||
+                (!string.IsNullOrEmpty(ConfigClockLayout) && ConfigClockLayout.Contains("Typographic", StringComparison.OrdinalIgnoreCase)) ||
+                string.Equals(SelectedWidget.PackageId, "rainmeter.mond-clock", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(SelectedWidget.PackageId, "builtin.typographic-clock", StringComparison.OrdinalIgnoreCase) ||
+                (!string.IsNullOrEmpty(SelectedWidget.InstanceId) && (SelectedWidget.InstanceId.Contains("typographic", StringComparison.OrdinalIgnoreCase) || SelectedWidget.InstanceId.Contains("mond-clock", StringComparison.OrdinalIgnoreCase)))
+            )
+        );
+
+    private void UpdateActiveFontFamilyOptions()
+    {
+        if (IsSelectedTypographicClock)
+        {
+            ActiveFontFamilyOptions = BundledFontHelper.TypographicClockFonts;
+            if (!BundledFontHelper.TypographicClockFonts.Contains(ConfigFontFamily, StringComparer.OrdinalIgnoreCase))
+                ConfigFontFamily = "SF Pro";
+            if (!BundledFontHelper.TypographicClockFonts.Contains(ConfigTimeFontFamily, StringComparer.OrdinalIgnoreCase))
+                ConfigTimeFontFamily = ConfigFontFamily;
+            if (!BundledFontHelper.TypographicClockFonts.Contains(ConfigDayFontFamily, StringComparer.OrdinalIgnoreCase))
+                ConfigDayFontFamily = "SF Pro Rounded";
+            if (!BundledFontHelper.TypographicClockFonts.Contains(ConfigDateFontFamily, StringComparer.OrdinalIgnoreCase))
+                ConfigDateFontFamily = "SF Compact";
+            if (!BundledFontHelper.TypographicClockFonts.Contains(ConfigGreetingFontFamily, StringComparer.OrdinalIgnoreCase))
+                ConfigGreetingFontFamily = "Lato";
+        }
+        else
+        {
+            ActiveFontFamilyOptions = _allFontFamilyOptions;
+        }
+
+        OnPropertyChanged(nameof(FontFamilyOptions));
+    }
+
+    partial void OnConfigClockLayoutChanged(string value)
+    {
+        UpdateActiveFontFamilyOptions();
+        SyncSelectedWidgetFields();
+    }
     partial void OnConfigFormat24HChanged(bool value) => SyncSelectedWidgetFields();
     partial void OnConfigShowAmPmChanged(bool value) => SyncSelectedWidgetFields();
     partial void OnConfigShowSecondsChanged(bool value) => SyncSelectedWidgetFields();

@@ -91,9 +91,26 @@ public sealed class LocalWidgetMarketplaceProvider : IWidgetMarketplaceProvider
 
             // ==================== RAINMETER-INSPIRED NON-GLASS DESIGNS ====================
             MakeEntry("rainmeter.mond-clock", "Typographic Clock", "Rainmeter Inspired", WidgetKind.DigitalClock, 5.0, 32400, true,
-                "Inspired by classic typographic desktop skins: borderless floating weekday, date, time & greeting with independent per-element fonts, scaling, accent/custom colors, and drop shadow.",
+                "Inspired by classic typographic desktop skins: borderless floating weekday, date, time & greeting with 12 bundled fonts (SF Pro, Lato, URW Gothic, etc.), per-element fonts, scaling, accent colors, and drop shadow.",
                 GlassmorphismStyle.GetPreset("Mond Transparent Serif"),
-                new() { ["Format24H"] = "false", ["ShowSeconds"] = "false", ["ShowGreeting"] = "true", ["ShowDay"] = "true", ["ShowDate"] = "true", ["CustomGreeting"] = "WEDNESDAY", ["FontFamily"] = "Bahnschrift", ["Alignment"] = "Center", ["FontScale"] = "1.15", ["ClockTextShadow"] = "0.55" }),
+                new()
+                {
+                    ["ClockLayout"] = "Typographic Clock (Spaced Day -> Time -> Date)",
+                    ["Format24H"] = "false",
+                    ["ShowSeconds"] = "false",
+                    ["ShowGreeting"] = "true",
+                    ["ShowDay"] = "true",
+                    ["ShowDate"] = "true",
+                    ["CustomGreeting"] = "WEDNESDAY",
+                    ["FontFamily"] = "SF Pro",
+                    ["TimeFontFamily"] = "SF Pro",
+                    ["DayFontFamily"] = "SF Pro Rounded",
+                    ["DateFontFamily"] = "SF Compact",
+                    ["GreetingFontFamily"] = "Lato",
+                    ["Alignment"] = "Center",
+                    ["FontScale"] = "1.15",
+                    ["ClockTextShadow"] = "0.55"
+                }),
 
             MakeEntry("rainmeter.illustro-sys", "Illustro Classic System Monitor", "Rainmeter Inspired", WidgetKind.SystemStats, 4.8, 28900, true,
                 "Inspired by Rainmeter Illustro: flat opaque slate diagnostic card with top hairline bar and focused CPU/RAM/Network/Disk meters (non-glass).",

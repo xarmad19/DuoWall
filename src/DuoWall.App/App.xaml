@@ -19,6 +19,7 @@
             <helpers:EnumEqualsConverter x:Key="EnumEq" />
             <helpers:EqualsMultiConverter x:Key="MultiEq" />
             <helpers:BoolToInfoBarSeverityConverter x:Key="BoolToSeverity" />
+            <helpers:FontResolverConverter x:Key="FontResolverConverter" />
 
             <!-- Elevated Surface Card Style -->
             <Style x:Key="DuoCardStyle" TargetType="Border">

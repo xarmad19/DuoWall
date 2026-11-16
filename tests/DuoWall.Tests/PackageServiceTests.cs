@@ -79,9 +79,122 @@ public sealed class PackageServiceTests : IDisposable
     public async Task LocalMarketplace_IncludesRainmeterInspiredNonGlassDesigns()
     {
         var catalog = await new LocalWidgetMarketplaceProvider().GetCatalogAsync();
-        Assert.Contains(catalog, c => c.Manifest.Id == "rainmeter.mond-clock" && c.Manifest.GlassStyle?.SurfaceTheme == WidgetSurfaceTheme.TransparentMinimal);
+        Assert.Contains(catalog, c => c.Manifest.Id == "rainmeter.mond-clock" &&
+                                      c.Manifest.GlassStyle?.SurfaceTheme == WidgetSurfaceTheme.TransparentMinimal &&
+                                      c.Manifest.DefaultSettings["FontFamily"] == "SF Pro");
         Assert.Contains(catalog, c => c.Manifest.Id == "rainmeter.illustro-sys" && c.Manifest.GlassStyle?.SurfaceTheme == WidgetSurfaceTheme.MatteFlatCard);
         Assert.Contains(catalog, c => c.Manifest.Id == "rainmeter.cyber-hud" && c.Manifest.GlassStyle?.SurfaceTheme == WidgetSurfaceTheme.RetroTerminalHUD);
+    }
+
+    [Fact]
+    public async Task GenerateAndValidate_TypographicClock_Package_Succeeds()
+    {
+        var svc = new WidgetPackageService();
+        string current = AppContext.BaseDirectory;
+        while (!string.IsNullOrEmpty(current) && !File.Exists(Path.Combine(current, "DuoWall.sln")))
+        {
+            current = Path.GetDirectoryName(current)!;
+        }
+        string repoRoot = current;
+        string fontsDir = Path.Combine(repoRoot, "src", "DuoWall.App", "Assets", "Fonts");
+        Assert.True(Directory.Exists(fontsDir), $"Fonts directory should exist at: {fontsDir}");
+
+        var fontFiles = Directory.GetFiles(fontsDir, "*.*")
+            .Where(f => f.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".otf", StringComparison.OrdinalIgnoreCase))
+            .ToList();
+        Assert.Equal(35, fontFiles.Count);
+
+        var assets = new Dictionary<string, string>();
+        foreach (var fontFile in fontFiles)
+        {
+            string rel = "Assets/Fonts/" + Path.GetFileName(fontFile);
+            assets[rel] = fontFile;
+        }
+
+        var fontOptions = new List<string>
+        {
+            "SF Pro", "SF Pro Rounded", "SF Compact", "Lato", "Liberation Sans", "Nimbus Sans",
+            "Noto Sans", "Noto Sans Display", "Noto Sans Mono", "Noto Serif", "Noto Serif Display", "URW Gothic"
+        };
+
+        var manifest = new DualWallWidgetPackageManifest
+        {
+            Id = "duowall.typographic-clock",
+            Name = "Typographic Clock",
+            Category = "Rainmeter Inspired",
+            Version = "2.0.0",
+            MinAppVersion = "2.0.0",
+            Author = "Syed Sarmad Iftikhar",
+            Description = "Curated typographic desktop timepiece with 12 bundled fonts (SF Pro, Lato, URW Gothic, Noto, Nimbus, Liberation), per-element typography, and borderless floating design.",
+            Rating = 5.0,
+            DownloadCount = 32400,
+            PackageType = PackageKind.Widget,
+            WidgetKind = WidgetKind.DigitalClock,
+            GlassStyle = GlassmorphismStyle.GetPreset("Mond Transparent Serif"),
+            Tags = new List<string> { "Rainmeter Inspired", "DigitalClock", "Typographic", "SF Pro", "Lato", "Glassmorphism" },
+            ConfigSchema = new List<WidgetConfigFieldSchema>
+            {
+                new() { Key = "FontFamily", Label = "Master Font Family", Type = "select", DefaultValue = "SF Pro", Options = fontOptions },
+                new() { Key = "TimeFontFamily", Label = "Time Font Family", Type = "select", DefaultValue = "SF Pro", Options = fontOptions },
+                new() { Key = "DayFontFamily", Label = "Day Font Family", Type = "select", DefaultValue = "SF Pro Rounded", Options = fontOptions },
+                new() { Key = "DateFontFamily", Label = "Date Font Family", Type = "select", DefaultValue = "SF Compact", Options = fontOptions },
+                new() { Key = "GreetingFontFamily", Label = "Greeting Font Family", Type = "select", DefaultValue = "Lato", Options = fontOptions },
+                new() { Key = "ClockLayout", Label = "Clock Layout", Type = "select", DefaultValue = "Typographic Clock (Spaced Day -> Time -> Date)" },
+                new() { Key = "TimeFontWeight", Label = "Time Weight", Type = "select", DefaultValue = "Bold" }
+            },
+            DefaultSettings = new Dictionary<string, string>
+            {
+                ["ClockLayout"] = "Typographic Clock (Spaced Day -> Time -> Date)",
+                ["FontFamily"] = "SF Pro",
+                ["TimeFontFamily"] = "SF Pro",
+                ["DayFontFamily"] = "SF Pro Rounded",
+                ["DateFontFamily"] = "SF Compact",
+                ["GreetingFontFamily"] = "Lato",
+                ["TimeFontWeight"] = "Bold",
+                ["Format24H"] = "false",
+                ["ShowSeconds"] = "false",
+                ["ShowDay"] = "true",
+                ["ShowDate"] = "true",
+                ["ShowGreeting"] = "true",
+                ["CustomGreeting"] = "WEDNESDAY",
+                ["DayPlacement"] = "Top",
+                ["DayCaseStyle"] = "Spaced Uppercase",
+                ["DatePlacement"] = "Bottom",
+                ["DateFormat"] = "dddd, MMM d yyyy",
+                ["Alignment"] = "Center",
+                ["VerticalAlignment"] = "Center",
+                ["ClockTimeBaseSize"] = "68",
+                ["FontScale"] = "1.15",
+                ["TimeScale"] = "1.25",
+                ["DayScale"] = "1.0",
+                ["DateScale"] = "0.95",
+                ["GreetingScale"] = "0.85",
+                ["ClockTextShadow"] = "0.55",
+                ["DayUseAccent"] = "true",
+                ["TimeUseAccent"] = "false",
+                ["DateUseAccent"] = "false",
+                ["GreetingUseAccent"] = "false"
+            }
+        };
+
+        string outPkgDir = Path.Combine(repoRoot, "packages");
+        Directory.CreateDirectory(outPkgDir);
+        string pkgPath = Path.Combine(outPkgDir, "Typographic Clock.widget.dwwp");
+
+        await svc.ExportPackageAsync(manifest, pkgPath, assets);
+        Assert.True(File.Exists(pkgPath));
+
+        string pubPkgDir = Path.Combine(repoRoot, "publish", "packages");
+        Directory.CreateDirectory(pubPkgDir);
+        File.Copy(pkgPath, Path.Combine(pubPkgDir, "Typographic Clock.widget.dwwp"), overwrite: true);
+
+        // Verify package integrity with ImportPackageAsync
+        string verifyDir = Path.Combine(_tempDir, "verify_install");
+        var res = await svc.ImportPackageAsync(pkgPath, verifyDir);
+        Assert.True(res.Success, $"Import failed: {res.ErrorMessage}");
+        Assert.NotNull(res.InstalledRecord);
+        Assert.True(Directory.Exists(res.InstalledRecord!.InstallDirectory));
+        Assert.Equal(35, Directory.GetFiles(Path.Combine(res.InstalledRecord.InstallDirectory, "Assets", "Fonts")).Length);
     }
 
     [Fact]

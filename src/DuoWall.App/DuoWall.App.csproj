@@ -32,6 +32,10 @@
 
   <ItemGroup>
     <Resource Include="Assets\duowall.ico" />
+    <Resource Include="Assets\Fonts\**\*" />
+    <Content Include="Assets\Fonts\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

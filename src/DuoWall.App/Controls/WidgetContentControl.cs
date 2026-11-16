@@ -288,11 +288,11 @@ public sealed class WidgetContentControl : UserControl
     private FontFamily ResolveFontFamily(string? explicitOverride = null)
     {
         if (!string.IsNullOrWhiteSpace(explicitOverride))
-            return new FontFamily(explicitOverride);
+            return BundledFontHelper.ResolveFontFamily(explicitOverride);
 
         string configured = GetConfig("FontFamily", string.Empty);
         if (!string.IsNullOrWhiteSpace(configured))
-            return new FontFamily(configured);
+            return BundledFontHelper.ResolveFontFamily(configured);
 
         var surface = (_glassSurface.GlassStyle ?? GlassmorphismStyle.BuiltInPresets[0]).SurfaceTheme;
         return surface switch

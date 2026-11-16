@@ -36,12 +36,22 @@
             </Setter>
         </Style>
 
-        <!-- Live font typeface preview inside dropdowns -->
+        <!-- Live font typeface preview inside dropdowns (curated + larger preview) -->
         <DataTemplate x:Key="LiveFontPreviewItemTemplate">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                <TextBlock Text="Aa  " FontFamily="{Binding}" FontWeight="Bold" FontSize="14" Foreground="#60A5FA" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding}" FontFamily="{Binding}" FontSize="13" VerticalAlignment="Center" />
-            </StackPanel>
+            <Grid Margin="0,4,0,4" VerticalAlignment="Center">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Border Grid.Column="0" Background="#182438" BorderBrush="#2A3F60" BorderThickness="1"
+                        CornerRadius="5" Padding="8,3" Margin="0,0,10,0" VerticalAlignment="Center" MinWidth="38">
+                    <TextBlock Text="Aa" FontFamily="{Binding Converter={StaticResource FontResolverConverter}}"
+                               FontWeight="SemiBold" FontSize="18" Foreground="#38BDF8"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <TextBlock Grid.Column="1" Text="{Binding}" FontFamily="{Binding Converter={StaticResource FontResolverConverter}}"
+                           FontSize="15" FontWeight="Normal" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+            </Grid>
         </DataTemplate>
     </UserControl.Resources>
 
@@ -887,8 +897,8 @@
                                             <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0">
-                                            <TextBlock Text="Master Font Family (All Fonts)" FontSize="11" Margin="0,0,0,3" />
-                                            <ComboBox ItemsSource="{Binding FontFamilyOptions}" SelectedItem="{Binding ConfigFontFamily}"
+                                            <TextBlock Text="Master Font Family" FontSize="11" Margin="0,0,0,3" />
+                                            <ComboBox ItemsSource="{Binding ActiveFontFamilyOptions}" SelectedItem="{Binding ConfigFontFamily}"
                                                       ItemTemplate="{StaticResource LiveFontPreviewItemTemplate}" />
                                         </StackPanel>
                                         <StackPanel Grid.Column="2">
@@ -933,7 +943,7 @@
                                                     <ColumnDefinition Width="Auto" /><ColumnDefinition Width="8" /><ColumnDefinition Width="82" />
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Grid.Column="0" Text="Time" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                                <ComboBox Grid.Column="1" ItemsSource="{Binding FontFamilyOptions}" SelectedItem="{Binding ConfigTimeFontFamily}"
+                                                <ComboBox Grid.Column="1" ItemsSource="{Binding ActiveFontFamilyOptions}" SelectedItem="{Binding ConfigTimeFontFamily}"
                                                           ItemTemplate="{StaticResource LiveFontPreviewItemTemplate}" />
                                                 <StackPanel Grid.Column="3" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding ConfigTimeScale, StringFormat='Scale {0:0.0}x'}" FontSize="10" />
@@ -951,7 +961,7 @@
                                                     <ColumnDefinition Width="Auto" /><ColumnDefinition Width="8" /><ColumnDefinition Width="82" />
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Grid.Column="0" Text="Day" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                                <ComboBox Grid.Column="1" ItemsSource="{Binding FontFamilyOptions}" SelectedItem="{Binding ConfigDayFontFamily}"
+                                                <ComboBox Grid.Column="1" ItemsSource="{Binding ActiveFontFamilyOptions}" SelectedItem="{Binding ConfigDayFontFamily}"
                                                           ItemTemplate="{StaticResource LiveFontPreviewItemTemplate}" />
                                                 <StackPanel Grid.Column="3" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding ConfigDayScale, StringFormat='Scale {0:0.0}x'}" FontSize="10" />
@@ -969,7 +979,7 @@
                                                     <ColumnDefinition Width="Auto" /><ColumnDefinition Width="8" /><ColumnDefinition Width="82" />
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Grid.Column="0" Text="Date" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                                <ComboBox Grid.Column="1" ItemsSource="{Binding FontFamilyOptions}" SelectedItem="{Binding ConfigDateFontFamily}"
+                                                <ComboBox Grid.Column="1" ItemsSource="{Binding ActiveFontFamilyOptions}" SelectedItem="{Binding ConfigDateFontFamily}"
                                                           ItemTemplate="{StaticResource LiveFontPreviewItemTemplate}" />
                                                 <StackPanel Grid.Column="3" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding ConfigDateScale, StringFormat='Scale {0:0.0}x'}" FontSize="10" />
@@ -987,7 +997,7 @@
                                                     <ColumnDefinition Width="Auto" /><ColumnDefinition Width="8" /><ColumnDefinition Width="82" />
                                                 </Grid.ColumnDefinitions>
                                                 <TextBlock Grid.Column="0" Text="Label" FontSize="11.5" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                                <ComboBox Grid.Column="1" ItemsSource="{Binding FontFamilyOptions}" SelectedItem="{Binding ConfigGreetingFontFamily}"
+                                                <ComboBox Grid.Column="1" ItemsSource="{Binding ActiveFontFamilyOptions}" SelectedItem="{Binding ConfigGreetingFontFamily}"
                                                           ItemTemplate="{StaticResource LiveFontPreviewItemTemplate}" />
                                                 <StackPanel Grid.Column="3" VerticalAlignment="Center">
                                                     <TextBlock Text="{Binding ConfigGreetingScale, StringFormat='Scale {0:0.0}x'}" FontSize="10" />

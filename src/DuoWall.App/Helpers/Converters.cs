@@ -118,3 +118,15 @@ public sealed class BoolToInfoBarSeverityConverter : IValueConverter
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
         Binding.DoNothing;
 }
+
+public sealed class FontResolverConverter : IValueConverter
+{
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        string? fontName = value?.ToString();
+        return BundledFontHelper.ResolveFontFamily(fontName);
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture) =>
+        Binding.DoNothing;
+}
