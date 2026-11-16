@@ -273,6 +273,52 @@ public sealed class V22FeatureTests : IDisposable
         Assert.InRange(Math.Abs(resizedPlan.ImageCanvasRect.Y - startPlan.ImageCanvasRect.Y), 0, 1.5);
     }
 
+    [Fact]
+    public async Task LocalWidgetMarketplaceProvider_ContainsQuickSettingsEntry_WithAllTogglesDefaultedToTrue()
+    {
+        var provider = new LocalWidgetMarketplaceProvider();
+        var catalog = await provider.GetCatalogAsync();
+
+        var qs = catalog.FirstOrDefault(e => e.Manifest.Id == "builtin.quick-settings");
+        Assert.NotNull(qs);
+        Assert.Equal(WidgetKind.QuickSettings, qs.Manifest.WidgetKind);
+        Assert.Equal("System & Utilities", qs.Manifest.Category);
+        Assert.Equal("true", qs.Manifest.DefaultSettings["ShowWifi"]);
+        Assert.Equal("true", qs.Manifest.DefaultSettings["ShowBluetooth"]);
+        Assert.Equal("true", qs.Manifest.DefaultSettings["ShowVolume"]);
+        Assert.Equal("true", qs.Manifest.DefaultSettings["ShowBrightness"]);
+        Assert.Equal("true", qs.Manifest.DefaultSettings["ShowControlPanel"]);
+        Assert.Equal("true", qs.Manifest.DefaultSettings["ShowTaskManager"]);
+        Assert.Equal("true", qs.Manifest.DefaultSettings["ShowSettings"]);
+        Assert.Equal("true", qs.Manifest.DefaultSettings["ShowMixer"]);
+        Assert.Equal("true", qs.Manifest.DefaultSettings["ShowBattery"]);
+    }
+
+    [Fact]
+    public void WidgetKind_QuickSettings_CanBeClonedAndConfigured()
+    {
+        var w = new WidgetInstance
+        {
+            Kind = WidgetKind.QuickSettings,
+            Title = "Quick Settings",
+            Width = 340,
+            Height = 280,
+            Config = new Dictionary<string, string>
+            {
+                ["ShowWifi"] = "false",
+                ["ShowVolume"] = "true"
+            }
+        };
+
+        var clone = w.Clone(newInstanceId: true);
+        Assert.NotEqual(w.InstanceId, clone.InstanceId);
+        Assert.Equal(WidgetKind.QuickSettings, clone.Kind);
+        Assert.Equal(340, clone.Width);
+        Assert.Equal(280, clone.Height);
+        Assert.Equal("false", clone.Config["ShowWifi"]);
+        Assert.Equal("true", clone.Config["ShowVolume"]);
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_tempDir, recursive: true); } catch { }

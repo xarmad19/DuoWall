@@ -111,6 +111,7 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
     [ObservableProperty] private bool _isConfigSystemStats;
     [ObservableProperty] private bool _isConfigFocusTimer;
     [ObservableProperty] private bool _isConfigShortcutBar;
+    [ObservableProperty] private bool _isConfigQuickSettings;
     [ObservableProperty] private bool _isConfigGenericOrCustom;
 
     // Common selected widget fields
@@ -255,6 +256,17 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
     [ObservableProperty] private bool _loopPanoramicVideo = true;
     [ObservableProperty] private bool _pauseVideoOnBattery;
     [ObservableProperty] private bool _pauseVideoOnFullScreen = true;
+
+    // Quick Settings Control Center controls
+    [ObservableProperty] private bool _configQsShowWifi = true;
+    [ObservableProperty] private bool _configQsShowBluetooth = true;
+    [ObservableProperty] private bool _configQsShowVolume = true;
+    [ObservableProperty] private bool _configQsShowBrightness = true;
+    [ObservableProperty] private bool _configQsShowControlPanel = true;
+    [ObservableProperty] private bool _configQsShowTaskManager = true;
+    [ObservableProperty] private bool _configQsShowSettings = true;
+    [ObservableProperty] private bool _configQsShowMixer = true;
+    [ObservableProperty] private bool _configQsShowBattery = true;
 
     // ==================== CENTRALIZED SURFACE & GLASSMORPHISM ENGINE ====================
     public ObservableCollection<GlassmorphismStyle> GlassPresets { get; } = new();
@@ -804,8 +816,8 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
             TargetMonitorAnchor = "PRIMARY",
             X = 48 + (_activeProfile.Widgets.Count % 4) * 26,
             Y = 48 + (_activeProfile.Widgets.Count % 4) * 26,
-            Width = NewWidgetKind == WidgetKind.AnalogClock ? 220 : (NewWidgetKind == WidgetKind.SystemStats ? 360 : 340),
-            Height = NewWidgetKind == WidgetKind.CalendarAgenda ? 330 : NewWidgetKind == WidgetKind.ShortcutBar ? 96 : (NewWidgetKind is WidgetKind.TodoList or WidgetKind.SystemStats ? 245 : 170),
+            Width = NewWidgetKind == WidgetKind.AnalogClock ? 220 : (NewWidgetKind is WidgetKind.SystemStats or WidgetKind.QuickSettings ? 360 : 340),
+            Height = NewWidgetKind == WidgetKind.CalendarAgenda ? 330 : NewWidgetKind == WidgetKind.ShortcutBar ? 96 : (NewWidgetKind is WidgetKind.TodoList or WidgetKind.SystemStats ? 245 : (NewWidgetKind == WidgetKind.QuickSettings ? 280 : 170)),
             UseGlobalGlassTheme = true,
             GlassStyle = LiveGlassStyle.Clone()
         };
@@ -1106,7 +1118,7 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
                 X = 48 + (_activeProfile.Widgets.Count % 4) * 26,
                 Y = 48 + (_activeProfile.Widgets.Count % 4) * 26,
                 Width = 340,
-                Height = m.WidgetKind == WidgetKind.CalendarAgenda ? 330 : m.WidgetKind == WidgetKind.ShortcutBar ? 96 : (m.WidgetKind == WidgetKind.SystemStats ? 245 : 180),
+                Height = m.WidgetKind == WidgetKind.CalendarAgenda ? 330 : m.WidgetKind == WidgetKind.ShortcutBar ? 96 : (m.WidgetKind == WidgetKind.SystemStats ? 245 : (m.WidgetKind == WidgetKind.QuickSettings ? 280 : 180)),
                 UseGlobalGlassTheme = false,
                 GlassStyle = (m.GlassStyle ?? LiveGlassStyle).Clone(),
                 Config = new Dictionary<string, string>(m.DefaultSettings, StringComparer.OrdinalIgnoreCase)
@@ -1428,6 +1440,17 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
         ConfigStatsShowUptime = GetBoolCfg(value, "ShowUptime", false);
         ConfigStatsShowPower = GetBoolCfg(value, "ShowPower", false);
 
+        // Quick Settings Control Center
+        ConfigQsShowWifi = GetBoolCfg(value, "ShowWifi", true);
+        ConfigQsShowBluetooth = GetBoolCfg(value, "ShowBluetooth", true);
+        ConfigQsShowVolume = GetBoolCfg(value, "ShowVolume", true);
+        ConfigQsShowBrightness = GetBoolCfg(value, "ShowBrightness", true);
+        ConfigQsShowControlPanel = GetBoolCfg(value, "ShowControlPanel", true);
+        ConfigQsShowTaskManager = GetBoolCfg(value, "ShowTaskManager", true);
+        ConfigQsShowSettings = GetBoolCfg(value, "ShowSettings", true);
+        ConfigQsShowMixer = GetBoolCfg(value, "ShowMixer", true);
+        ConfigQsShowBattery = GetBoolCfg(value, "ShowBattery", true);
+
         WidgetFocusWorkMinutes = int.TryParse(GetCfg(value, "WorkMinutes", "25"), out int wm) ? wm : 25;
         WidgetFocusBreakMinutes = int.TryParse(GetCfg(value, "BreakMinutes", "5"), out int bm) ? bm : 5;
         WidgetCustomSubtitle = GetCfg(value, "Subtitle", string.Empty);
@@ -1444,6 +1467,7 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
         IsConfigSystemStats = kind == WidgetKind.SystemStats;
         IsConfigFocusTimer = kind == WidgetKind.FocusTimer;
         IsConfigShortcutBar = kind == WidgetKind.ShortcutBar;
+        IsConfigQuickSettings = kind == WidgetKind.QuickSettings;
         IsConfigGenericOrCustom = kind is WidgetKind.CustomDeclarative or WidgetKind.CalendarAgenda or WidgetKind.TodoList or WidgetKind.PanoramicVideo;
     }
 
@@ -1469,6 +1493,16 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
 
     partial void OnConfigShortcutLayoutChanged(string value) => SyncSelectedWidgetFields();
     partial void OnConfigShortcutIconScaleChanged(double value) => SyncSelectedWidgetFields();
+
+    partial void OnConfigQsShowWifiChanged(bool value) => SyncSelectedWidgetFields();
+    partial void OnConfigQsShowBluetoothChanged(bool value) => SyncSelectedWidgetFields();
+    partial void OnConfigQsShowVolumeChanged(bool value) => SyncSelectedWidgetFields();
+    partial void OnConfigQsShowBrightnessChanged(bool value) => SyncSelectedWidgetFields();
+    partial void OnConfigQsShowControlPanelChanged(bool value) => SyncSelectedWidgetFields();
+    partial void OnConfigQsShowTaskManagerChanged(bool value) => SyncSelectedWidgetFields();
+    partial void OnConfigQsShowSettingsChanged(bool value) => SyncSelectedWidgetFields();
+    partial void OnConfigQsShowMixerChanged(bool value) => SyncSelectedWidgetFields();
+    partial void OnConfigQsShowBatteryChanged(bool value) => SyncSelectedWidgetFields();
 
     partial void OnSelectedWidgetPresetOverrideChanged(GlassmorphismStyle? value)
     {
@@ -1690,6 +1724,16 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
         c["ShowUptime"] = ConfigStatsShowUptime ? "true" : "false";
         c["ShowPower"] = ConfigStatsShowPower ? "true" : "false";
 
+        c["ShowWifi"] = ConfigQsShowWifi ? "true" : "false";
+        c["ShowBluetooth"] = ConfigQsShowBluetooth ? "true" : "false";
+        c["ShowVolume"] = ConfigQsShowVolume ? "true" : "false";
+        c["ShowBrightness"] = ConfigQsShowBrightness ? "true" : "false";
+        c["ShowControlPanel"] = ConfigQsShowControlPanel ? "true" : "false";
+        c["ShowTaskManager"] = ConfigQsShowTaskManager ? "true" : "false";
+        c["ShowSettings"] = ConfigQsShowSettings ? "true" : "false";
+        c["ShowMixer"] = ConfigQsShowMixer ? "true" : "false";
+        c["ShowBattery"] = ConfigQsShowBattery ? "true" : "false";
+
         c["WorkMinutes"] = Math.Clamp(WidgetFocusWorkMinutes, 1, 180).ToString(CultureInfo.InvariantCulture);
         c["BreakMinutes"] = Math.Clamp(WidgetFocusBreakMinutes, 1, 60).ToString(CultureInfo.InvariantCulture);
         if (!string.IsNullOrWhiteSpace(WidgetCustomSubtitle))
@@ -1838,6 +1882,7 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
         WidgetKind.FocusTimer => "Focus Timer",
         WidgetKind.SystemStats => "System Telemetry",
         WidgetKind.ShortcutBar => "Quick Shortcut Dock",
+        WidgetKind.QuickSettings => "Quick Settings Control Center",
         WidgetKind.PanoramicVideo => "Panoramic Video",
         _ => "Custom Widget"
     };

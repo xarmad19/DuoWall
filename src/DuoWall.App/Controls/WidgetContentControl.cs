@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Windows;
@@ -98,6 +99,13 @@ public sealed class WidgetContentControl : UserControl
     // Video
     private TextBlock? _vidTitleText;
     private TextBlock? _vidStateText;
+
+    // Quick Settings Control Center
+    private Slider? _qsVolumeSlider;
+    private TextBlock? _qsVolumeText;
+    private System.Windows.Shapes.Path? _qsVolumeIconPath;
+    private bool _isUpdatingVolumeInternally;
+    private bool _isDraggingVolumeSlider;
 
     public event Action<List<TodoTaskItem>>? TodoListChanged;
     public event Action? RefreshWeatherRequested;
@@ -223,6 +231,11 @@ public sealed class WidgetContentControl : UserControl
             }
         }
 
+        if (_widget.Kind == WidgetKind.QuickSettings)
+        {
+            UpdateQuickSettingsVolumeDisplay();
+        }
+
         RefreshDynamicValues();
     }
 
@@ -268,7 +281,9 @@ public sealed class WidgetContentControl : UserControl
         $"{GetConfig("WeatherIconTheme", "Animated Minimal")}|" +
         $"{GetConfig("ShortcutLayout", "Horizontal")}|{GetConfig("ShortcutIconScale", "1.00")}|{GetConfig("ShortcutItemsJson", "")}|" +
         $"{GetConfig("WorkMinutes", "25")}|{GetConfig("BreakMinutes", "5")}|" +
-        $"{GetConfig("AnalogDialStyle", "")}|{GetConfig("StatsLayout", GetConfig("Mode", ""))}|{_calMonthOffset}";
+        $"{GetConfig("AnalogDialStyle", "")}|{GetConfig("StatsLayout", GetConfig("Mode", ""))}|{_calMonthOffset}|" +
+        $"{GetConfig("ShowWifi", "")}|{GetConfig("ShowBluetooth", "")}|{GetConfig("ShowVolume", "")}|{GetConfig("ShowBrightness", "")}|" +
+        $"{GetConfig("ShowControlPanel", "")}|{GetConfig("ShowTaskManager", "")}|{GetConfig("ShowSettings", "")}|{GetConfig("ShowMixer", "")}|{GetConfig("ShowBattery", "")}";
 
     private FontFamily ResolveFontFamily(string? explicitOverride = null)
     {
@@ -395,6 +410,9 @@ public sealed class WidgetContentControl : UserControl
         _wxLastRenderedIconKey = string.Empty;
         _shortcutItemsHost = null;
         _vidTitleText = null;
+        _qsVolumeSlider = null;
+        _qsVolumeText = null;
+        _qsVolumeIconPath = null;
 
         _outerPaddingHost.Child = _widget.Kind switch
         {
@@ -407,6 +425,7 @@ public sealed class WidgetContentControl : UserControl
             WidgetKind.SystemStats => BuildSystemStats(),
             WidgetKind.ShortcutBar => BuildShortcutBar(),
             WidgetKind.PanoramicVideo => BuildPanoramicVideoCard(),
+            WidgetKind.QuickSettings => BuildQuickSettingsWidget(),
             _ => BuildCustomDeclarative()
         };
     }
@@ -1213,6 +1232,470 @@ public sealed class WidgetContentControl : UserControl
         }
 
         return stack;
+    }
+
+    private UIElement BuildQuickSettingsWidget()
+    {
+        var ff = ResolveFontFamily();
+        Color primary = PrimaryTextColor();
+        Color secondary = SecondaryTextColor();
+        Color accent = AccentColor();
+
+        bool showWifi = GetBoolConfig("ShowWifi", true);
+        bool showBt = GetBoolConfig("ShowBluetooth", true);
+        bool showVol = GetBoolConfig("ShowVolume", true);
+        bool showDisp = GetBoolConfig("ShowBrightness", true);
+        bool showCp = GetBoolConfig("ShowControlPanel", true);
+        bool showTm = GetBoolConfig("ShowTaskManager", true);
+        bool showSet = GetBoolConfig("ShowSettings", true);
+        bool showMix = GetBoolConfig("ShowMixer", true);
+        bool showBat = GetBoolConfig("ShowBattery", true);
+
+        var root = new StackPanel
+        {
+            Orientation = Orientation.Vertical,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+
+        // --- ROW 1: Connectivity (Wi-Fi & Bluetooth) ---
+        if (showWifi || showBt)
+        {
+            var connGrid = new Grid { Margin = new Thickness(0, 0, 0, 7) };
+            if (showWifi && showBt)
+            {
+                connGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                connGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(7, GridUnitType.Pixel) });
+                connGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+                var wifiPill = CreateQuickSettingsPill(
+                    "Wi-Fi", "Networks",
+                    "M 2,5 A 14,14 0 0 1 18,5 M 5,8 A 10,10 0 0 1 15,8 M 8,11 A 6,6 0 0 1 12,11 M 10,14 A 1,1 0 1 1 10,14.01",
+                    accent, primary, secondary, ff,
+                    () => LaunchQuickSettingsTarget("explorer.exe ms-availablenetworks:", "ms-settings:network-wifi"));
+                Grid.SetColumn(wifiPill, 0);
+                connGrid.Children.Add(wifiPill);
+
+                var btPill = CreateQuickSettingsPill(
+                    "Bluetooth", "Devices",
+                    "M 6,3 L 14,9 L 10,13 L 10,1 L 14,5 L 6,11",
+                    Color.FromRgb(59, 130, 246), primary, secondary, ff,
+                    () => LaunchQuickSettingsTarget("ms-settings:bluetooth"));
+                Grid.SetColumn(btPill, 2);
+                connGrid.Children.Add(btPill);
+            }
+            else
+            {
+                connGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                if (showWifi)
+                {
+                    var wifiPill = CreateQuickSettingsPill(
+                        "Wi-Fi", "Available Networks",
+                        "M 2,5 A 14,14 0 0 1 18,5 M 5,8 A 10,10 0 0 1 15,8 M 8,11 A 6,6 0 0 1 12,11 M 10,14 A 1,1 0 1 1 10,14.01",
+                        accent, primary, secondary, ff,
+                        () => LaunchQuickSettingsTarget("explorer.exe ms-availablenetworks:", "ms-settings:network-wifi"));
+                    connGrid.Children.Add(wifiPill);
+                }
+                else
+                {
+                    var btPill = CreateQuickSettingsPill(
+                        "Bluetooth", "Connected Devices",
+                        "M 6,3 L 14,9 L 10,13 L 10,1 L 14,5 L 6,11",
+                        Color.FromRgb(59, 130, 246), primary, secondary, ff,
+                        () => LaunchQuickSettingsTarget("ms-settings:bluetooth"));
+                    connGrid.Children.Add(btPill);
+                }
+            }
+            root.Children.Add(connGrid);
+        }
+
+        // --- ROW 2: Volume Slider ---
+        if (showVol)
+        {
+            var volBorder = new Border
+            {
+                Height = 42,
+                CornerRadius = new CornerRadius(13),
+                Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
+                BorderBrush = new SolidColorBrush(Color.FromArgb(45, 255, 255, 255)),
+                BorderThickness = new Thickness(1),
+                Padding = new Thickness(8, 0, 10, 0),
+                Margin = new Thickness(0, 0, 0, 7)
+            };
+
+            var volGrid = new Grid();
+            volGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            volGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            volGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+
+            float currentVol = AudioVolumeHelper.GetMasterVolumePercent();
+            bool isMuted = AudioVolumeHelper.GetIsMuted();
+
+            _qsVolumeIconPath = new System.Windows.Shapes.Path
+            {
+                Width = 16,
+                Height = 16,
+                Stretch = Stretch.Uniform,
+                Stroke = new SolidColorBrush(primary),
+                StrokeThickness = 1.7,
+                Fill = new SolidColorBrush(primary),
+                Data = isMuted || currentVol < 1
+                    ? Geometry.Parse("M 3,6 L 6,6 L 10,2 L 10,14 L 6,10 L 3,10 Z M 13,5 L 17,9 M 17,5 L 13,9")
+                    : Geometry.Parse("M 3,6 L 6,6 L 10,2 L 10,14 L 6,10 L 3,10 Z M 13,5 A 4,4 0 0 1 13,11 M 15.5,2.5 A 8,8 0 0 1 15.5,13.5")
+            };
+
+            var speakerBtn = new Button
+            {
+                Width = 26,
+                Height = 26,
+                Background = Brushes.Transparent,
+                BorderBrush = Brushes.Transparent,
+                BorderThickness = new Thickness(0),
+                Cursor = Cursors.Hand,
+                ToolTip = "Click to Toggle Mute",
+                Content = _qsVolumeIconPath,
+                Margin = new Thickness(0, 0, 6, 0)
+            };
+            speakerBtn.Click += (_, _) =>
+            {
+                bool nowMuted = AudioVolumeHelper.ToggleMute();
+                float v = AudioVolumeHelper.GetMasterVolumePercent();
+                if (_qsVolumeText != null)
+                {
+                    _qsVolumeText.Text = nowMuted ? "MUTED" : $"{Math.Round(v)}%";
+                }
+                if (_qsVolumeIconPath != null)
+                {
+                    _qsVolumeIconPath.Data = nowMuted
+                        ? Geometry.Parse("M 3,6 L 6,6 L 10,2 L 10,14 L 6,10 L 3,10 Z M 13,5 L 17,9 M 17,5 L 13,9")
+                        : Geometry.Parse("M 3,6 L 6,6 L 10,2 L 10,14 L 6,10 L 3,10 Z M 13,5 A 4,4 0 0 1 13,11 M 15.5,2.5 A 8,8 0 0 1 15.5,13.5");
+                }
+            };
+            Grid.SetColumn(speakerBtn, 0);
+            volGrid.Children.Add(speakerBtn);
+
+            _qsVolumeSlider = new Slider
+            {
+                Minimum = 0,
+                Maximum = 100,
+                Value = Math.Round(currentVol),
+                SmallChange = 1,
+                LargeChange = 5,
+                VerticalAlignment = VerticalAlignment.Center,
+                Margin = new Thickness(2, 0, 6, 0),
+                Cursor = Cursors.Hand
+            };
+            _qsVolumeSlider.AddHandler(UIElement.PreviewMouseDownEvent, new MouseButtonEventHandler((_, _) => _isDraggingVolumeSlider = true), true);
+            _qsVolumeSlider.AddHandler(UIElement.PreviewMouseUpEvent, new MouseButtonEventHandler((_, _) => _isDraggingVolumeSlider = false), true);
+
+            _qsVolumeSlider.ValueChanged += (s, e) =>
+            {
+                if (_isUpdatingVolumeInternally) return;
+                float newVol = (float)e.NewValue;
+                AudioVolumeHelper.SetMasterVolumePercent(newVol);
+                if (_qsVolumeText != null)
+                {
+                    _qsVolumeText.Text = $"{Math.Round(newVol)}%";
+                }
+                if (_qsVolumeIconPath != null && newVol >= 1)
+                {
+                    _qsVolumeIconPath.Data = Geometry.Parse("M 3,6 L 6,6 L 10,2 L 10,14 L 6,10 L 3,10 Z M 13,5 A 4,4 0 0 1 13,11 M 15.5,2.5 A 8,8 0 0 1 15.5,13.5");
+                }
+            };
+            Grid.SetColumn(_qsVolumeSlider, 1);
+            volGrid.Children.Add(_qsVolumeSlider);
+
+            _qsVolumeText = new TextBlock
+            {
+                Text = isMuted ? "MUTED" : $"{Math.Round(currentVol)}%",
+                FontFamily = ff,
+                FontSize = 11,
+                FontWeight = FontWeights.SemiBold,
+                Foreground = new SolidColorBrush(primary),
+                VerticalAlignment = VerticalAlignment.Center,
+                Width = 42,
+                TextAlignment = TextAlignment.Right
+            };
+            Grid.SetColumn(_qsVolumeText, 2);
+            volGrid.Children.Add(_qsVolumeText);
+
+            volBorder.Child = volGrid;
+            root.Children.Add(volBorder);
+        }
+
+        // --- ROW 3: Display / Brightness button ---
+        if (showDisp)
+        {
+            var dispPill = CreateQuickSettingsPill(
+                "Display & Brightness", "Windows Display Settings",
+                "M 2,3 H 18 V 13 H 2 Z M 6,15 H 14 M 10,13 V 15",
+                Color.FromRgb(245, 158, 11), primary, secondary, ff,
+                () => LaunchQuickSettingsTarget("ms-settings:display"),
+                isWide: true);
+            dispPill.Margin = new Thickness(0, 0, 0, 7);
+            root.Children.Add(dispPill);
+        }
+
+        // --- ROW 4: Quick Action Tiles (Control Panel, Task Manager, Settings, Mixer, Battery) ---
+        var tiles = new List<FrameworkElement>();
+
+        if (showCp)
+        {
+            tiles.Add(CreateQuickSettingsTile(
+                "Control Panel",
+                "M 2,4 H 14 M 5,2 V 6 M 2,9 H 14 M 11,7 V 11 M 2,14 H 14 M 7,12 V 16",
+                accent, primary, ff,
+                () => LaunchQuickSettingsTarget("control.exe")));
+        }
+
+        if (showTm)
+        {
+            tiles.Add(CreateQuickSettingsTile(
+                "Task Mgr",
+                "M 1,9 L 4,9 L 6,3 L 9,15 L 12,8 L 15,9",
+                Color.FromRgb(16, 185, 129), primary, ff,
+                () => LaunchQuickSettingsTarget("taskmgr.exe")));
+        }
+
+        if (showSet)
+        {
+            tiles.Add(CreateQuickSettingsTile(
+                "Settings",
+                "M 8,2 A 6,6 0 1,0 8,14 A 6,6 0 1,0 8,2 Z M 8,5 A 3,3 0 1,0 8,11 A 3,3 0 1,0 8,5 Z",
+                Color.FromRgb(168, 85, 247), primary, ff,
+                () => LaunchQuickSettingsTarget("ms-settings:")));
+        }
+
+        if (showMix)
+        {
+            tiles.Add(CreateQuickSettingsTile(
+                "Mixer",
+                "M 3,2 V 14 M 1,6 H 5 M 8,2 V 14 M 6,10 H 10 M 13,2 V 14 M 11,5 H 15",
+                Color.FromRgb(236, 72, 153), primary, ff,
+                () => LaunchQuickSettingsTarget("sndvol.exe")));
+        }
+
+        if (showBat)
+        {
+            tiles.Add(CreateQuickSettingsTile(
+                "Power",
+                "M 8,1 V 8 M 4,4 A 6,6 0 1,0 12,4",
+                Color.FromRgb(239, 68, 68), primary, ff,
+                () => LaunchQuickSettingsTarget("ms-settings:powersleep")));
+        }
+
+        if (tiles.Count > 0)
+        {
+            var tilesWrap = new WrapPanel
+            {
+                Orientation = Orientation.Horizontal,
+                HorizontalAlignment = HorizontalAlignment.Center
+            };
+            foreach (var t in tiles)
+            {
+                tilesWrap.Children.Add(t);
+            }
+            root.Children.Add(tilesWrap);
+        }
+
+        return root;
+    }
+
+    private void UpdateQuickSettingsVolumeDisplay()
+    {
+        if (_qsVolumeSlider == null || _qsVolumeText == null || _isDraggingVolumeSlider) return;
+
+        try
+        {
+            float vol = AudioVolumeHelper.GetMasterVolumePercent();
+            bool isMuted = AudioVolumeHelper.GetIsMuted();
+
+            _isUpdatingVolumeInternally = true;
+            _qsVolumeSlider.Value = Math.Round(vol);
+            _qsVolumeText.Text = isMuted ? "MUTED" : $"{Math.Round(vol)}%";
+
+            if (_qsVolumeIconPath != null)
+            {
+                _qsVolumeIconPath.Data = isMuted || vol < 1
+                    ? Geometry.Parse("M 3,6 L 6,6 L 10,2 L 10,14 L 6,10 L 3,10 Z M 13,5 L 17,9 M 17,5 L 13,9")
+                    : Geometry.Parse("M 3,6 L 6,6 L 10,2 L 10,14 L 6,10 L 3,10 Z M 13,5 A 4,4 0 0 1 13,11 M 15.5,2.5 A 8,8 0 0 1 15.5,13.5");
+            }
+            _isUpdatingVolumeInternally = false;
+        }
+        catch { }
+    }
+
+    private FrameworkElement CreateQuickSettingsPill(
+        string title, string subtitle, string iconPathData,
+        Color iconAccent, Color primary, Color secondary, FontFamily ff,
+        Action onClick, bool isWide = false)
+    {
+        var border = new Border
+        {
+            Height = isWide ? 40 : 48,
+            CornerRadius = new CornerRadius(13),
+            Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(45, 255, 255, 255)),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(9, 0, 9, 0),
+            Cursor = Cursors.Hand
+        };
+
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+
+        var iconBadge = new Border
+        {
+            Width = 28,
+            Height = 28,
+            CornerRadius = new CornerRadius(14),
+            Background = new SolidColorBrush(Color.FromArgb(50, iconAccent.R, iconAccent.G, iconAccent.B)),
+            Margin = new Thickness(0, 0, 9, 0),
+            VerticalAlignment = VerticalAlignment.Center,
+            Child = new System.Windows.Shapes.Path
+            {
+                Width = 15,
+                Height = 15,
+                Stretch = Stretch.Uniform,
+                Stroke = new SolidColorBrush(iconAccent),
+                StrokeThickness = 1.8,
+                Data = Geometry.Parse(iconPathData)
+            }
+        };
+        Grid.SetColumn(iconBadge, 0);
+        grid.Children.Add(iconBadge);
+
+        var textStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center };
+        textStack.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontFamily = ff,
+            FontSize = 11.5,
+            FontWeight = FontWeights.SemiBold,
+            Foreground = new SolidColorBrush(primary),
+            TextTrimming = TextTrimming.CharacterEllipsis
+        });
+        if (!string.IsNullOrWhiteSpace(subtitle))
+        {
+            textStack.Children.Add(new TextBlock
+            {
+                Text = subtitle,
+                FontFamily = ff,
+                FontSize = 9.5,
+                Foreground = new SolidColorBrush(secondary),
+                TextTrimming = TextTrimming.CharacterEllipsis
+            });
+        }
+        Grid.SetColumn(textStack, 1);
+        grid.Children.Add(textStack);
+
+        border.Child = grid;
+
+        border.MouseEnter += (_, _) =>
+        {
+            border.Background = new SolidColorBrush(Color.FromArgb(65, 255, 255, 255));
+            border.BorderBrush = new SolidColorBrush(Color.FromArgb(90, 255, 255, 255));
+        };
+        border.MouseLeave += (_, _) =>
+        {
+            border.Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
+            border.BorderBrush = new SolidColorBrush(Color.FromArgb(45, 255, 255, 255));
+        };
+        border.MouseLeftButtonUp += (_, _) => onClick();
+
+        return border;
+    }
+
+    private FrameworkElement CreateQuickSettingsTile(
+        string title, string iconPathData,
+        Color iconAccent, Color primary, FontFamily ff,
+        Action onClick)
+    {
+        var border = new Border
+        {
+            Width = 56,
+            Height = 56,
+            Margin = new Thickness(3.5),
+            CornerRadius = new CornerRadius(12),
+            Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255)),
+            BorderBrush = new SolidColorBrush(Color.FromArgb(45, 255, 255, 255)),
+            BorderThickness = new Thickness(1),
+            Cursor = Cursors.Hand
+        };
+
+        var stack = new StackPanel
+        {
+            VerticalAlignment = VerticalAlignment.Center,
+            HorizontalAlignment = HorizontalAlignment.Center
+        };
+
+        stack.Children.Add(new System.Windows.Shapes.Path
+        {
+            Width = 18,
+            Height = 18,
+            Stretch = Stretch.Uniform,
+            Stroke = new SolidColorBrush(iconAccent),
+            StrokeThickness = 1.8,
+            Data = Geometry.Parse(iconPathData),
+            Margin = new Thickness(0, 0, 0, 3)
+        });
+
+        stack.Children.Add(new TextBlock
+        {
+            Text = title,
+            FontFamily = ff,
+            FontSize = 9,
+            FontWeight = FontWeights.Medium,
+            Foreground = new SolidColorBrush(primary),
+            HorizontalAlignment = HorizontalAlignment.Center,
+            TextTrimming = TextTrimming.CharacterEllipsis,
+            MaxWidth = 52
+        });
+
+        border.Child = stack;
+
+        border.MouseEnter += (_, _) =>
+        {
+            border.Background = new SolidColorBrush(Color.FromArgb(65, 255, 255, 255));
+            border.BorderBrush = new SolidColorBrush(Color.FromArgb(90, 255, 255, 255));
+        };
+        border.MouseLeave += (_, _) =>
+        {
+            border.Background = new SolidColorBrush(Color.FromArgb(40, 255, 255, 255));
+            border.BorderBrush = new SolidColorBrush(Color.FromArgb(45, 255, 255, 255));
+        };
+        border.MouseLeftButtonUp += (_, _) => onClick();
+
+        return border;
+    }
+
+    private static void LaunchQuickSettingsTarget(string primaryTarget, string? fallbackTarget = null)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = primaryTarget,
+                UseShellExecute = true
+            };
+            Process.Start(psi);
+        }
+        catch
+        {
+            if (!string.IsNullOrWhiteSpace(fallbackTarget))
+            {
+                try
+                {
+                    var psi = new ProcessStartInfo
+                    {
+                        FileName = fallbackTarget,
+                        UseShellExecute = true
+                    };
+                    Process.Start(psi);
+                }
+                catch { }
+            }
+        }
     }
 
     private void ApplyResponsiveContentScaling()

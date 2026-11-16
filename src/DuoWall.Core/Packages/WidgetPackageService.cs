@@ -73,6 +73,22 @@ public sealed class LocalWidgetMarketplaceProvider : IWidgetMarketplaceProvider
                 GlassmorphismStyle.GetPreset("Midnight Glass"),
                 new() { ["Mode"] = "Detailed" }),
 
+            MakeEntry("builtin.quick-settings", "Apple Quick Settings Control Center", "System & Utilities", WidgetKind.QuickSettings, 5.0, 24600, true,
+                "macOS / iOS styled Control Center in frosted glass with Wi-Fi, Bluetooth, live Master Volume slider, Display, Control Panel, Task Manager, Settings, and Sound Mixer.",
+                GlassmorphismStyle.GetPreset("Frosted Glass"),
+                new()
+                {
+                    ["ShowWifi"] = "true",
+                    ["ShowBluetooth"] = "true",
+                    ["ShowVolume"] = "true",
+                    ["ShowBrightness"] = "true",
+                    ["ShowControlPanel"] = "true",
+                    ["ShowTaskManager"] = "true",
+                    ["ShowSettings"] = "true",
+                    ["ShowMixer"] = "true",
+                    ["ShowBattery"] = "true"
+                }),
+
             // ==================== RAINMETER-INSPIRED NON-GLASS DESIGNS ====================
             MakeEntry("rainmeter.mond-clock", "Typographic Clock", "Rainmeter Inspired", WidgetKind.DigitalClock, 5.0, 32400, true,
                 "Inspired by classic typographic desktop skins: borderless floating weekday, date, time & greeting with independent per-element fonts, scaling, accent/custom colors, and drop shadow.",

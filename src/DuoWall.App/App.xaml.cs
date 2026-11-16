@@ -15,6 +15,13 @@ namespace DuoWall.App;
 
 public partial class App : Application
 {
+    private const string SingleInstanceMutexName = "DuoWallBySRMD_SingleInstance_Mutex";
+    private const string SingleInstanceEventName = "DuoWallBySRMD_ShowMainWindow_Event";
+
+    private static Mutex? _singleInstanceMutex;
+    private static EventWaitHandle? _singleInstanceEvent;
+    private static Thread? _singleInstanceThread;
+
     private ServiceProvider? _services;
 
     protected override async void OnStartup(StartupEventArgs e)
@@ -37,6 +44,73 @@ public partial class App : Application
             if (args.ExceptionObject is Exception ex)
                 LogCrash(ex);
         };
+
+        // Single instance check: if another instance is already running, signal it and exit immediately
+        bool isFirstInstance;
+        try
+        {
+            _singleInstanceMutex = new Mutex(true, SingleInstanceMutexName, out isFirstInstance);
+        }
+        catch
+        {
+            isFirstInstance = false;
+        }
+
+        if (!isFirstInstance)
+        {
+            try
+            {
+                using var showEvent = EventWaitHandle.OpenExisting(SingleInstanceEventName);
+                showEvent.Set();
+            }
+            catch { }
+
+            Shutdown(0);
+            return;
+        }
+
+        // Primary instance: listen for wake signals from subsequent launches
+        try
+        {
+            _singleInstanceEvent = new EventWaitHandle(false, EventResetMode.AutoReset, SingleInstanceEventName);
+            _singleInstanceThread = new Thread(() =>
+            {
+                while (_singleInstanceEvent != null)
+                {
+                    try
+                    {
+                        if (_singleInstanceEvent.WaitOne())
+                        {
+                            Current?.Dispatcher?.BeginInvoke(() =>
+                            {
+                                var trayMgr = _services?.GetService<SystemTrayManager>();
+                                if (trayMgr != null)
+                                {
+                                    trayMgr.RestoreMainWindow();
+                                }
+                                else if (MainWindow != null)
+                                {
+                                    if (!MainWindow.IsVisible) MainWindow.Show();
+                                    if (MainWindow.WindowState == WindowState.Minimized) MainWindow.WindowState = WindowState.Normal;
+                                    MainWindow.Activate();
+                                    MainWindow.Focus();
+                                }
+                            });
+                        }
+                    }
+                    catch
+                    {
+                        break;
+                    }
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "DuoWall_SingleInstance_Listener"
+            };
+            _singleInstanceThread.Start();
+        }
+        catch { }
 
         bool startupApply = e.Args.Any(a => string.Equals(a, "--startup-apply", StringComparison.OrdinalIgnoreCase));
         int diagIdx = Array.FindIndex(e.Args, a => string.Equals(a, "--diagnostics", StringComparison.OrdinalIgnoreCase));
@@ -66,6 +140,7 @@ public partial class App : Application
         sc.AddSingleton<YouTubeWallpaperService>();
         sc.AddSingleton<TaskbarTweaksService>();
         sc.AddSingleton<DesktopOverlayCoordinator>();
+        sc.AddSingleton<SystemTrayManager>();
         sc.AddSingleton<MainViewModel>();
         sc.AddSingleton<MainWindow>();
 
@@ -78,6 +153,10 @@ public partial class App : Application
         var mainWindow = _services.GetRequiredService<MainWindow>();
         mainWindow.DataContext = vm;
         mainWindow.AttachCoordinator(_services.GetRequiredService<DesktopOverlayCoordinator>());
+
+        var trayManager = _services.GetRequiredService<SystemTrayManager>();
+        trayManager.Initialize(mainWindow, vm);
+        mainWindow.AttachTrayManager(trayManager);
 
         if (startupApply)
         {
@@ -102,6 +181,21 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        try
+        {
+            _services?.GetService<SystemTrayManager>()?.Dispose();
+        }
+        catch { }
+
+        try
+        {
+            _singleInstanceEvent?.Dispose();
+            _singleInstanceEvent = null;
+            _singleInstanceMutex?.Dispose();
+            _singleInstanceMutex = null;
+        }
+        catch { }
+
         _services?.Dispose();
         base.OnExit(e);
     }
@@ -169,26 +263,27 @@ public partial class App : Application
         window.UpdateLayout();
         await Task.Delay(1200);
 
-        // 1. Gallery View
+        // 1. Home / Gallery View
         vm.CurrentPageIndex = 0;
         window.UpdateLayout();
         await Task.Delay(800);
         SaveElementToPng(window, System.IO.Path.Combine(outDir, "01_wallpaper_gallery.png"), 1360, 860);
 
         // 2. Placement Studio
-        vm.CurrentPageIndex = 1;
+        vm.CurrentPageIndex = 2;
         window.UpdateLayout();
         await Task.Delay(800);
         SaveElementToPng(window, System.IO.Path.Combine(outDir, "02_placement_studio.png"), 1360, 860);
 
         // 3. Widget Marketplace
-        vm.CurrentPageIndex = 2;
+        vm.CurrentPageIndex = 6;
+        vm.WidgetStudio.StudioSectionIndex = 2;
         window.UpdateLayout();
         await Task.Delay(800);
         SaveElementToPng(window, System.IO.Path.Combine(outDir, "03_widget_marketplace.png"), 1360, 860);
 
         // 4. Taskbar Tweaks
-        vm.CurrentPageIndex = 3;
+        vm.CurrentPageIndex = 9;
         window.UpdateLayout();
         await Task.Delay(800);
         SaveElementToPng(window, System.IO.Path.Combine(outDir, "04_taskbar_tweaks.png"), 1360, 860);
@@ -207,6 +302,30 @@ public partial class App : Application
         if (ah <= 0) ah = 440;
         SaveElementToPng(about, System.IO.Path.Combine(outDir, "05_about_me_dialog.png"), aw, ah);
         about.Close();
+
+        // 6. Quick Settings Widget (Apple Style)
+        try
+        {
+            var qsWidget = new DuoWall.Core.Widgets.WidgetInstance
+            {
+                Kind = DuoWall.Core.Widgets.WidgetKind.QuickSettings,
+                Title = "Quick Settings Control Center",
+                Width = 340,
+                Height = 280,
+                GlassStyle = DuoWall.Core.Theming.GlassmorphismStyle.GetPreset("Frosted Glass")
+            };
+            var qsControl = new Controls.WidgetContentControl
+            {
+                Width = 340,
+                Height = 280
+            };
+            qsControl.Bind(qsWidget, qsWidget.GlassStyle, false);
+            qsControl.Measure(new Size(340, 280));
+            qsControl.Arrange(new Rect(0, 0, 340, 280));
+            qsControl.UpdateLayout();
+            SaveElementToPng(qsControl, System.IO.Path.Combine(outDir, "06_quick_settings_widget.png"), 340, 280);
+        }
+        catch { }
     }
 
     private static void SaveElementToPng(FrameworkElement element, string filePath, int width, int height)

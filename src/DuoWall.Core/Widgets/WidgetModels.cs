@@ -17,6 +17,7 @@ public enum WidgetKind
     AmbientGeometry,
     PanoramicVideo,
     ShortcutBar,
+    QuickSettings,
     CustomDeclarative
 }
 

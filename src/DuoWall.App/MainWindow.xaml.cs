@@ -9,6 +9,9 @@ namespace DuoWall.App;
 
 public partial class MainWindow : FluentWindow
 {
+    private SystemTrayManager? _trayManager;
+    private bool _isExplicitExit;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -19,6 +22,32 @@ public partial class MainWindow : FluentWindow
     public void AttachCoordinator(DesktopOverlayCoordinator coordinator)
     {
         ViewWidgetStudio.AttachCoordinator(coordinator);
+    }
+
+    public void AttachTrayManager(SystemTrayManager trayManager)
+    {
+        _trayManager = trayManager;
+    }
+
+    protected override void OnClosing(CancelEventArgs e)
+    {
+        if (!_isExplicitExit)
+        {
+            e.Cancel = true;
+            Hide();
+            return;
+        }
+
+        _trayManager?.RemoveIcon();
+        base.OnClosing(e);
+    }
+
+    public void ExitApplication()
+    {
+        _isExplicitExit = true;
+        _trayManager?.RemoveIcon();
+        Close();
+        Application.Current?.Shutdown();
     }
 
     private void OnDataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
