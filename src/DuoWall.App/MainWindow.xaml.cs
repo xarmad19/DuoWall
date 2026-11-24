@@ -22,6 +22,7 @@ public partial class MainWindow : FluentWindow
     public void AttachCoordinator(DesktopOverlayCoordinator coordinator)
     {
         ViewWidgetStudio.AttachCoordinator(coordinator);
+        coordinator.HotkeyManager.Initialize(new System.Windows.Interop.WindowInteropHelper(this).EnsureHandle());
     }
 
     public void AttachTrayManager(SystemTrayManager trayManager)

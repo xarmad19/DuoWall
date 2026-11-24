@@ -698,6 +698,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             LiveVideoPath = IsVideoWallpaperStaged ? _stagedLiveVideoPath : Settings.ActiveLiveVideoPath,
             LiveVideoStillPath = IsVideoWallpaperStaged ? StagedWallpaper?.Model.LocalOriginalPath : Settings.ActiveLiveVideoStillPath,
             ActiveGlassPresetId = Settings.ActiveGlassPresetId,
+            ActiveGlassCustomJson = Settings.ActiveGlassCustomJson,
             WidgetAccentColorHex = WidgetStudio.WidgetAccentColorHex,
             AutoWidgetAccentFromWallpaper = WidgetStudio.AutoAccentFromWallpaper,
             Placement = placement.Clone(),

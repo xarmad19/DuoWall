@@ -27,11 +27,32 @@ public partial class DesktopWidgetHostWindow : Window
         public int Y;
     }
 
+    private const int WM_SYSCOMMAND = 0x0112;
+    private const int SC_MINIMIZE = 0xF020;
+    private const int WM_WINDOWPOSCHANGING = 0x0046;
+    private const int WM_SHOWWINDOW = 0x0018;
+    private const int WM_SIZE = 0x0005;
+    private const int SIZE_MINIMIZED = 1;
+    private const uint SWP_HIDEWINDOW = 0x0080;
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WINDOWPOS
+    {
+        public IntPtr hwnd;
+        public IntPtr hwndInsertAfter;
+        public int x;
+        public int y;
+        public int cx;
+        public int cy;
+        public uint flags;
+    }
+
     [DllImport("user32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool GetCursorPos(out POINT lpPoint);
 
     private IntPtr _hwnd = IntPtr.Zero;
+    private bool _isClosing;
     private WidgetInstance _widget = new();
     private GlassmorphismStyle _effectiveStyle = GlassmorphismStyle.BuiltInPresets[0].Clone();
     private bool _isEditMode;
@@ -50,10 +71,26 @@ public partial class DesktopWidgetHostWindow : Window
         InitializeComponent();
         MouseMove += OnHostMouseMove;
         PreviewMouseLeftButtonUp += OnHostMouseUp;
+        StateChanged += OnStateChanged;
+        Closing += (_, _) => _isClosing = true;
     }
 
+    public IntPtr Hwnd => _hwnd;
     public Controls.WidgetContentControl ContentControl => WidgetContent;
     public string InstanceId => _widget.InstanceId;
+
+    private void OnStateChanged(object? sender, EventArgs e)
+    {
+        if (_isClosing) return;
+        if (WindowState == WindowState.Minimized && _widget.IsVisible)
+        {
+            WindowState = WindowState.Normal;
+            if (_hwnd != IntPtr.Zero)
+            {
+                GlassBackdropHelper.SendToBottomZOrder(_hwnd);
+            }
+        }
+    }
 
     protected override void OnSourceInitialized(EventArgs e)
     {
@@ -61,8 +98,67 @@ public partial class DesktopWidgetHostWindow : Window
         _hwnd = new WindowInteropHelper(this).Handle;
 
         GlassBackdropHelper.ConfigureDesktopOverlayWindow(_hwnd, excludeFromAeroPeek: false);
+        GlassBackdropHelper.AttachToDesktopShellOwner(_hwnd);
         GlassBackdropHelper.SetClickThrough(_hwnd, _widget.IsClickThrough && !_isEditMode);
         GlassBackdropHelper.SendToBottomZOrder(_hwnd);
+
+        var source = HwndSource.FromHwnd(_hwnd);
+        source?.AddHook(WndProc);
+    }
+
+    private IntPtr WndProc(IntPtr hwnd, int msg, IntPtr wParam, IntPtr lParam, ref bool handled)
+    {
+        if (_isClosing) return IntPtr.Zero;
+
+        switch (msg)
+        {
+            case WM_SYSCOMMAND:
+                if ((wParam.ToInt64() & 0xFFF0) == SC_MINIMIZE)
+                {
+                    handled = true;
+                    return IntPtr.Zero;
+                }
+                break;
+
+            case WM_WINDOWPOSCHANGING:
+                if (_widget.IsVisible && lParam != IntPtr.Zero)
+                {
+                    try
+                    {
+                        var pos = Marshal.PtrToStructure<WINDOWPOS>(lParam);
+                        if ((pos.flags & SWP_HIDEWINDOW) != 0)
+                        {
+                            pos.flags &= ~SWP_HIDEWINDOW;
+                            Marshal.StructureToPtr(pos, lParam, false);
+                        }
+                    }
+                    catch
+                    {
+                        // Ignore
+                    }
+                }
+                break;
+
+            case WM_SHOWWINDOW:
+                if (wParam == IntPtr.Zero && _widget.IsVisible && lParam != IntPtr.Zero)
+                {
+                    handled = true;
+                    return IntPtr.Zero;
+                }
+                break;
+
+            case WM_SIZE:
+                if (wParam.ToInt32() == SIZE_MINIMIZED && _widget.IsVisible)
+                {
+                    WindowState = WindowState.Normal;
+                    GlassBackdropHelper.SendToBottomZOrder(_hwnd);
+                    handled = true;
+                    return IntPtr.Zero;
+                }
+                break;
+        }
+
+        return IntPtr.Zero;
     }
 
     public void SetGridOptions(bool snapEnabled, int gridSizePx)

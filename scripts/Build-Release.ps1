@@ -7,6 +7,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if (Test-Path "$env:LOCALAPPDATA\Microsoft\dotnet\dotnet.exe") {
+    $env:PATH = "$env:LOCALAPPDATA\Microsoft\dotnet;$env:PATH"
+}
 $root = Split-Path -Parent $PSScriptRoot
 $pubDir = Join-Path $root "publish\DuoWall-Portable"
 $zipPath = Join-Path $root "publish\DuoWall-v$Version-win-x64-Portable.zip"

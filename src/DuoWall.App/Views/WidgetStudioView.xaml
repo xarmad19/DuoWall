@@ -1056,6 +1056,62 @@
                                         <CheckBox Content="System Uptime" IsChecked="{Binding ConfigStatsShowUptime}" Margin="0,0,0,6" />
                                         <CheckBox Content="Battery / AC Power Status" IsChecked="{Binding ConfigStatsShowPower}" Margin="0,0,0,6" />
                                     </UniformGrid>
+
+                                    <Separator Margin="0,10,0,10" Opacity="0.15" />
+
+                                    <TextBlock Text="NETWORK ADAPTER QUICK SWITCHER" FontSize="11" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextFillColorTertiaryBrush}" Margin="0,0,0,8" />
+
+                                    <CheckBox Content="Show Network Adapter Quick-Switch Glass Buttons" 
+                                              IsChecked="{Binding ConfigStatsShowNetAdapters}" Margin="0,0,0,10" />
+
+                                    <Grid Margin="0,0,0,4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="14" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel Grid.Column="0">
+                                            <TextBlock Text="Switch Adapter Shortcut Key" FontSize="11.5" Margin="0,0,0,4" />
+                                            <StackPanel Orientation="Horizontal">
+                                                <ui:TextBox Text="{Binding ConfigStatsNetSwitchHotkey, UpdateSourceTrigger=PropertyChanged}"
+                                                            Width="160" PlaceholderText="e.g. Ctrl+Alt+N"
+                                                            ToolTip="Global shortcut to switch / cycle active network connections" />
+                                                <ui:Button Content="Ctrl+Alt+N" Appearance="Secondary" Margin="6,0,0,0" Padding="8,3"
+                                                           Command="{Binding SetDefaultNetSwitchHotkeyCommand}" ToolTip="Set to default Ctrl+Alt+N" />
+                                                <ui:Button Content="Clear" Appearance="Secondary" Margin="4,0,0,0" Padding="8,3"
+                                                           Command="{Binding ClearNetSwitchHotkeyCommand}" ToolTip="Clear shortcut key" />
+                                            </StackPanel>
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" VerticalAlignment="Center" TextWrapping="Wrap" FontSize="11"
+                                                   Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                   Text="Pressing this global shortcut toggles between available network adapters (disabling other connections and enabling the selected one)." />
+                                    </Grid>
+
+                                    <!-- Silent Switching Permission Helper -->
+                                    <Border Margin="0,12,0,0" Padding="12,10" Background="#0CFFFFFF" CornerRadius="8" BorderBrush="#1FFFFFFF" BorderThickness="1">
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="14" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <ui:SymbolIcon Symbol="ShieldCheckmark24" FontSize="15" Margin="0,0,6,0" VerticalAlignment="Center" />
+                                                    <TextBlock Text="Silent Switching (No UAC Prompts)" FontSize="12" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                                <TextBlock Text="{Binding NetSwitchSilentTipText}"
+                                                           FontSize="11" Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                                           TextWrapping="Wrap" Margin="0,3,0,0" />
+                                            </StackPanel>
+                                            <ui:Button Grid.Column="2" VerticalAlignment="Center"
+                                                       Content="{Binding NetSwitchSilentStatusText}"
+                                                       IsEnabled="{Binding IsNetSwitchSilentConfigured, Converter={StaticResource InvBool}}"
+                                                       Appearance="Secondary" Padding="12,5"
+                                                       Command="{Binding EnableSilentNetSwitchCommand}" />
+                                        </Grid>
+                                    </Border>
                                 </StackPanel>
                             </Border>
 

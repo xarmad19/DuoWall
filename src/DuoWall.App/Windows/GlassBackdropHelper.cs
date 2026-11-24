@@ -11,6 +11,7 @@ namespace DuoWall.App.Windows;
 public static class GlassBackdropHelper
 {
     private const int GWL_EXSTYLE = -20;
+    private const int GWLP_HWNDPARENT = -8;
     private const int WS_EX_TRANSPARENT = 0x00000020;
     private const int WS_EX_TOOLWINDOW = 0x00000080;
 
@@ -109,6 +110,85 @@ public static class GlassBackdropHelper
     [DllImport("gdi32.dll")]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool DeleteObject(IntPtr hObject);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr FindWindow(string? lpClassName, string? lpWindowName);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string? lpszClass, string? lpszWindow);
+
+    private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+    /// <summary>
+    /// Finds the HWND of the Windows desktop shell view (SHELLDLL_DefView), hosted by Progman or WorkerW.
+    /// </summary>
+    public static IntPtr GetDesktopShellViewHwnd()
+    {
+        try
+        {
+            IntPtr progman = FindWindow("Progman", null);
+            if (progman != IntPtr.Zero)
+            {
+                IntPtr defView = FindWindowEx(progman, IntPtr.Zero, "SHELLDLL_DefView", null);
+                if (defView != IntPtr.Zero)
+                {
+                    return defView;
+                }
+            }
+
+            // In Windows 10/11, SHELLDLL_DefView is often a child of a top-level WorkerW window
+            IntPtr foundDefView = IntPtr.Zero;
+            EnumWindows((topHwnd, _) =>
+            {
+                IntPtr shellView = FindWindowEx(topHwnd, IntPtr.Zero, "SHELLDLL_DefView", null);
+                if (shellView != IntPtr.Zero)
+                {
+                    foundDefView = shellView;
+                    return false; // Stop enumeration
+                }
+                return true; // Continue
+            }, IntPtr.Zero);
+
+            if (foundDefView != IntPtr.Zero)
+            {
+                return foundDefView;
+            }
+
+            // Fallback to progman directly
+            return progman;
+        }
+        catch
+        {
+            return IntPtr.Zero;
+        }
+    }
+
+    /// <summary>
+    /// Attaches the specified window handle to the desktop shell view as its owner (hWndOwner via GWLP_HWNDPARENT).
+    /// This informs Windows Shell that the window is a desktop accessory, preventing Windows from minimizing
+    /// it when the user presses Win + D (Show Desktop).
+    /// </summary>
+    public static bool AttachToDesktopShellOwner(IntPtr hwnd)
+    {
+        if (hwnd == IntPtr.Zero) return false;
+
+        IntPtr shellView = GetDesktopShellViewHwnd();
+        if (shellView == IntPtr.Zero) return false;
+
+        try
+        {
+            SetWindowLong(hwnd, GWLP_HWNDPARENT, shellView.ToInt64());
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
 
     /// <summary>
     /// Returns true if Windows DWM desktop composition is active and capable of backdrop blur.

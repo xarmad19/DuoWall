@@ -37,6 +37,36 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
     private bool _suppressGlassPush;
     private bool _suppressWidgetPush;
 
+    private static readonly JsonSerializerOptions GlassJsonOpts = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        WriteIndented = false
+    };
+
+    private void PersistActiveGlassStyle()
+    {
+        if (_suppressGlassPush) return;
+
+        try
+        {
+            string glassJson = JsonSerializer.Serialize(LiveGlassStyle, GlassJsonOpts);
+            _settings.ActiveGlassPresetId = LiveGlassStyle.Id;
+            _settings.ActiveGlassCustomJson = glassJson;
+            _db.SaveSettings(_settings);
+
+            if (_activeProfile != null)
+            {
+                _activeProfile.GlassPresetName = LiveGlassStyle.Name;
+                _activeProfile.CustomGlassStyleJson = glassJson;
+                _db.SaveDesktopProfile(_activeProfile);
+            }
+        }
+        catch
+        {
+            // Non-fatal persistence failure
+        }
+    }
+
     public WidgetStudioViewModel(
         DuoWallDatabase db,
         WidgetPackageService packageService,
@@ -242,6 +272,11 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
     [ObservableProperty] private bool _configStatsShowCpu = true;
     [ObservableProperty] private bool _configStatsShowRam = true;
     [ObservableProperty] private bool _configStatsShowNet = true;
+    [ObservableProperty] private bool _configStatsShowNetAdapters = true;
+    [ObservableProperty] private string _configStatsNetSwitchHotkey = "Ctrl+Alt+N";
+    [ObservableProperty] private bool _isNetSwitchSilentConfigured;
+    [ObservableProperty] private string _netSwitchSilentStatusText = "Enable Silent Switching";
+    [ObservableProperty] private string _netSwitchSilentTipText = "Configure a one-time Windows task helper so adapters switch without UAC permission popups.";
     [ObservableProperty] private bool _configStatsShowDisk = true;
     [ObservableProperty] private bool _configStatsShowAllDrives;
     [ObservableProperty] private bool _configStatsShowGpu = true;
@@ -335,24 +370,53 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
         WidgetAccentColorHex = string.IsNullOrWhiteSpace(settings.WidgetAccentColorHex) ? "#FF38BDF8" : settings.WidgetAccentColorHex;
         LoadGlassPresets();
 
-        var initialStyle = AllSelectableStylePresets.FirstOrDefault(p =>
-            string.Equals(p.Id, settings.ActiveGlassPresetId, StringComparison.OrdinalIgnoreCase) ||
-            string.Equals(p.Name, settings.ActiveGlassPresetId, StringComparison.OrdinalIgnoreCase))
-            ?? GlassmorphismStyle.BuiltInPresets[0];
+        // 1. Check if we have saved custom glass JSON or saved preset
+        GlassmorphismStyle? restoredStyle = null;
 
-        SelectedGlassPreset = initialStyle;
-        ApplyStyleToEditorSliders(initialStyle.Clone());
+        string? savedJson = activeProfile?.CustomGlassStyleJson ?? settings.ActiveGlassCustomJson;
+        if (!string.IsNullOrWhiteSpace(savedJson))
+        {
+            try
+            {
+                restoredStyle = JsonSerializer.Deserialize<GlassmorphismStyle>(savedJson, GlassJsonOpts);
+            }
+            catch { }
+        }
+
+        if (restoredStyle == null)
+        {
+            string? targetNameOrId = activeProfile?.GlassPresetName ?? settings.ActiveGlassPresetId;
+            if (!string.IsNullOrWhiteSpace(targetNameOrId))
+            {
+                restoredStyle = AllSelectableStylePresets.FirstOrDefault(p =>
+                    string.Equals(p.Id, targetNameOrId, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(p.Name, targetNameOrId, StringComparison.OrdinalIgnoreCase));
+            }
+        }
+
+        restoredStyle ??= GlassmorphismStyle.BuiltInPresets[0];
+
+        _suppressGlassPush = true;
+        var matchingPreset = AllSelectableStylePresets.FirstOrDefault(p =>
+            string.Equals(p.Id, restoredStyle.Id, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(p.Name, restoredStyle.Name, StringComparison.OrdinalIgnoreCase));
+
+        SelectedGlassPreset = matchingPreset ?? restoredStyle;
+        ApplyStyleToEditorSliders(restoredStyle.Clone());
+
         if (!string.IsNullOrWhiteSpace(WidgetAccentColorHex))
         {
             GlassAccentHex = WidgetAccentColorHex;
             LiveGlassStyle.AccentHex = WidgetAccentColorHex;
         }
-        BindActiveProfile(activeProfile);
+        _suppressGlassPush = false;
+
+        BindActiveProfile(activeProfile, restoreGlassFromProfile: false);
         RefreshWallpaperPreviewBackdrop(settings.LastAppliedImagePath);
         await ReloadMarketplaceAsync();
     }
 
-    public void BindActiveProfile(DesktopProfile? profile)
+    public void BindActiveProfile(DesktopProfile? profile, bool restoreGlassFromProfile = true)
     {
         _activeProfile = profile;
         ActiveProfileBadge = profile?.Name ?? "No Profile";
@@ -368,14 +432,42 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
             PauseVideoOnBattery = profile.PauseVideoOnBattery;
             PauseVideoOnFullScreen = profile.PauseVideoOnFullScreen;
 
-            var presetMatch = AllSelectableStylePresets.FirstOrDefault(p =>
-                string.Equals(p.Name, profile.GlassPresetName, StringComparison.OrdinalIgnoreCase));
-            if (presetMatch != null)
-                SelectedGlassPreset = presetMatch;
+            if (restoreGlassFromProfile)
+            {
+                GlassmorphismStyle? profileStyle = null;
+                if (!string.IsNullOrWhiteSpace(profile.CustomGlassStyleJson))
+                {
+                    try
+                    {
+                        profileStyle = JsonSerializer.Deserialize<GlassmorphismStyle>(profile.CustomGlassStyleJson, GlassJsonOpts);
+                    }
+                    catch { }
+                }
+
+                if (profileStyle == null && !string.IsNullOrWhiteSpace(profile.GlassPresetName))
+                {
+                    profileStyle = AllSelectableStylePresets.FirstOrDefault(p =>
+                        string.Equals(p.Name, profile.GlassPresetName, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(p.Id, profile.GlassPresetName, StringComparison.OrdinalIgnoreCase));
+                }
+
+                if (profileStyle != null)
+                {
+                    _suppressGlassPush = true;
+                    var presetMatch = AllSelectableStylePresets.FirstOrDefault(p =>
+                        string.Equals(p.Name, profileStyle.Name, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(p.Id, profileStyle.Id, StringComparison.OrdinalIgnoreCase));
+                    SelectedGlassPreset = presetMatch ?? profileStyle;
+                    ApplyStyleToEditorSliders(profileStyle.Clone());
+                    _suppressGlassPush = false;
+                    _coordinator.UpdateGlobalGlassLive(LiveGlassStyle, profile.WidgetBrightness);
+                }
+            }
         }
 
         SelectedWidget = Widgets.FirstOrDefault();
         RefreshMarketplaceDesktopPresence();
+        RefreshSilentSwitchStatus();
         PreviewSurfaceInvalidated?.Invoke();
     }
 
@@ -383,10 +475,9 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
     {
         ApplyStyleToEditorSliders(style.Clone());
         _coordinator.UpdateGlobalGlassLive(LiveGlassStyle, _activeProfile?.WidgetBrightness ?? 1.0);
-        if (persistToProfile && _activeProfile != null)
+        if (persistToProfile)
         {
-            _activeProfile.GlassPresetName = style.Name;
-            _db.SaveDesktopProfile(_activeProfile);
+            PersistActiveGlassStyle();
         }
         PreviewSurfaceInvalidated?.Invoke();
     }
@@ -490,6 +581,51 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
     private void ToggleLayoutLock()
     {
         IsDesktopEditMode = !IsDesktopEditMode;
+    }
+
+    [RelayCommand]
+    private void SetDefaultNetSwitchHotkey()
+    {
+        ConfigStatsNetSwitchHotkey = "Ctrl+Alt+N";
+    }
+
+    [RelayCommand]
+    private void ClearNetSwitchHotkey()
+    {
+        ConfigStatsNetSwitchHotkey = string.Empty;
+    }
+
+    public void RefreshSilentSwitchStatus()
+    {
+        IsNetSwitchSilentConfigured = NetworkAdapterService.IsSilentSwitchingConfigured();
+        if (IsNetSwitchSilentConfigured)
+        {
+            NetSwitchSilentStatusText = "✓ Silent Mode Active";
+            NetSwitchSilentTipText = NetworkAdapterService.IsProcessAdmin
+                ? "DuoWall is running with administrator privileges. Network switches execute silently in the background."
+                : "Windows task helper is active. Network switches execute silently in the background without UAC popups.";
+        }
+        else
+        {
+            NetSwitchSilentStatusText = "Enable Silent Switching";
+            NetSwitchSilentTipText = "Click to authorize a one-time Windows task helper so adapters switch silently without UAC popups.";
+        }
+    }
+
+    [RelayCommand]
+    private async Task EnableSilentNetSwitchAsync()
+    {
+        _setStatus("Authorizing one-time Windows task for silent background switching...", false);
+        bool ok = await NetworkAdapterService.RegisterSilentNetSwitchTaskAsync();
+        RefreshSilentSwitchStatus();
+        if (ok || IsNetSwitchSilentConfigured)
+        {
+            _setStatus("Silent network switching enabled! Adapters will now switch without UAC permission prompts.", false);
+        }
+        else
+        {
+            _setStatus("Authorization was cancelled. Running DuoWall as Administrator also switches silently.", true);
+        }
     }
 
     [RelayCommand]
@@ -763,6 +899,29 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
             WidgetAccentColorHex = backup.WidgetAccentColorHex;
         }
 
+        if (!string.IsNullOrWhiteSpace(backup.ActiveGlassCustomJson))
+        {
+            try
+            {
+                var custom = JsonSerializer.Deserialize<GlassmorphismStyle>(backup.ActiveGlassCustomJson, GlassJsonOpts);
+                if (custom != null)
+                {
+                    ApplyGlobalGlassFromExternal(custom, persistToProfile: true);
+                }
+            }
+            catch { }
+        }
+        else if (!string.IsNullOrWhiteSpace(backup.ActiveGlassPresetId))
+        {
+            var match = AllSelectableStylePresets.FirstOrDefault(p =>
+                string.Equals(p.Id, backup.ActiveGlassPresetId, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(p.Name, backup.ActiveGlassPresetId, StringComparison.OrdinalIgnoreCase));
+            if (match != null)
+            {
+                SelectedGlassPreset = match;
+            }
+        }
+
         SelectedWidget = Widgets.FirstOrDefault();
         PersistAndPushProfile();
     }
@@ -954,6 +1113,7 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
         _db.SaveCustomGlassPreset(custom);
         LoadGlassPresets();
         SelectedGlassPreset = GlassPresets.FirstOrDefault(p => p.Id == custom.Id) ?? custom;
+        PersistActiveGlassStyle();
         _setStatus($"Saved custom preset '{custom.Name}'.", false);
     }
 
@@ -988,8 +1148,12 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
     private void ApplyGlassToAllGlobalWidgets()
     {
         if (_activeProfile == null) return;
+        string glassJson = JsonSerializer.Serialize(LiveGlassStyle, GlassJsonOpts);
         _settings.ActiveGlassPresetId = LiveGlassStyle.Id;
+        _settings.ActiveGlassCustomJson = glassJson;
         _activeProfile.GlassPresetName = LiveGlassStyle.Name;
+        _activeProfile.CustomGlassStyleJson = glassJson;
+        _db.SaveSettings(_settings);
         foreach (var w in _activeProfile.Widgets.Where(x => x.UseGlobalGlassTheme))
         {
             w.GlassStyle = LiveGlassStyle.Clone();
@@ -1004,6 +1168,33 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
     [RelayCommand]
     private async Task ReloadMarketplaceAsync()
     {
+        // Proactively auto-discover local .dwwp package files from common locations
+        try
+        {
+            var autoScanPaths = new List<string>
+            {
+                @"d:\Downloads\System & Network.widget.dwwp",
+                Path.Combine(_settings.PackagesDirectory, "System & Network.widget.dwwp")
+            };
+            if (Directory.Exists(_settings.PackagesDirectory))
+            {
+                autoScanPaths.AddRange(Directory.GetFiles(_settings.PackagesDirectory, "*.dwwp"));
+            }
+
+            foreach (var path in autoScanPaths.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                if (File.Exists(path))
+                {
+                    var res = await _packageService.ImportPackageAsync(path, _settings.PackagesDirectory);
+                    if (res.Success && res.InstalledRecord != null)
+                    {
+                        _db.SaveInstalledPackage(res.InstalledRecord);
+                    }
+                }
+            }
+        }
+        catch { }
+
         var builtInCatalog = await _marketplaceProvider.GetCatalogAsync();
         var installed = _db.LoadInstalledPackages();
         var installedIds = new HashSet<string>(installed.Select(i => i.PackageId), StringComparer.OrdinalIgnoreCase);
@@ -1026,13 +1217,18 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
             {
                 var manifest = JsonSerializer.Deserialize<DualWallWidgetPackageManifest>(
                     rec.ManifestJson,
-                    new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+                    new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.CamelCase, PropertyNameCaseInsensitive = true });
                 if (manifest != null)
                 {
+                    if (manifest.Tags.Count == 0)
+                    {
+                        manifest.Tags.AddRange(new[] { "Monitoring", "Network", "Adapter", "Adapters", "System", "Telemetry" });
+                    }
+
                     _allMarketplaceEntries.Add(new MarketplaceCatalogEntry
                     {
                         Manifest = manifest,
-                        IsFeatured = false,
+                        IsFeatured = true,
                         IsInstalled = true,
                         SourceBadge = "Imported (.dwwp)"
                     });
@@ -1049,7 +1245,9 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
     {
         if (_activeProfile == null) return null;
         var exact = _activeProfile.Widgets.FirstOrDefault(w =>
-            string.Equals(w.PackageId, entry.Manifest.Id, StringComparison.OrdinalIgnoreCase));
+            string.Equals(w.PackageId, entry.Manifest.Id, StringComparison.OrdinalIgnoreCase) ||
+            (entry.Manifest.Id == "builtin.system-network" && string.Equals(w.PackageId, "user.widget.0147a284", StringComparison.OrdinalIgnoreCase)) ||
+            (entry.Manifest.Id == "user.widget.0147a284" && string.Equals(w.PackageId, "builtin.system-network", StringComparison.OrdinalIgnoreCase)));
         if (exact != null) return exact;
 
         if (entry.Manifest.PackageType == PackageKind.Widget && !entry.Manifest.Id.StartsWith("rainmeter.", StringComparison.OrdinalIgnoreCase))
@@ -1131,6 +1329,13 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
                 GlassStyle = (m.GlassStyle ?? LiveGlassStyle).Clone(),
                 Config = new Dictionary<string, string>(m.DefaultSettings, StringComparer.OrdinalIgnoreCase)
             };
+
+        if (widget.Kind == WidgetKind.SystemStats)
+        {
+            if (widget.Height < 220) widget.Height = 220;
+            if (!widget.Config.ContainsKey("ShowNetAdapters")) widget.Config["ShowNetAdapters"] = "true";
+            if (!widget.Config.ContainsKey("NetSwitchHotkey")) widget.Config["NetSwitchHotkey"] = "Ctrl+Alt+N";
+        }
 
         _activeProfile.Widgets.Add(widget);
         Widgets.Add(widget);
@@ -1442,6 +1647,8 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
         ConfigStatsShowCpu = GetBoolCfg(value, "ShowCpu", true);
         ConfigStatsShowRam = GetBoolCfg(value, "ShowRam", true);
         ConfigStatsShowNet = GetBoolCfg(value, "ShowNet", true);
+        ConfigStatsShowNetAdapters = GetBoolCfg(value, "ShowNetAdapters", true);
+        ConfigStatsNetSwitchHotkey = GetCfg(value, "NetSwitchHotkey", "Ctrl+Alt+N");
         ConfigStatsShowDisk = GetBoolCfg(value, "ShowDisk", true);
         ConfigStatsShowAllDrives = GetBoolCfg(value, "ShowAllDrives", false);
         ConfigStatsShowGpu = GetBoolCfg(value, "ShowGpu", true);
@@ -1646,6 +1853,12 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
     partial void OnConfigStatsShowCpuChanged(bool value) => SyncSelectedWidgetFields();
     partial void OnConfigStatsShowRamChanged(bool value) => SyncSelectedWidgetFields();
     partial void OnConfigStatsShowNetChanged(bool value) => SyncSelectedWidgetFields();
+    partial void OnConfigStatsShowNetAdaptersChanged(bool value) => SyncSelectedWidgetFields();
+    partial void OnConfigStatsNetSwitchHotkeyChanged(string value)
+    {
+        SyncSelectedWidgetFields();
+        _coordinator.UpdateNetSwitchHotkey(value);
+    }
     partial void OnConfigStatsShowDiskChanged(bool value) => SyncSelectedWidgetFields();
     partial void OnConfigStatsShowAllDrivesChanged(bool value) => SyncSelectedWidgetFields();
     partial void OnConfigStatsShowGpuChanged(bool value) => SyncSelectedWidgetFields();
@@ -1659,9 +1872,10 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
 
     partial void OnSelectedGlassPresetChanged(GlassmorphismStyle? value)
     {
-        if (value == null) return;
+        if (_suppressGlassPush || value == null) return;
         ApplyStyleToEditorSliders(value.Clone());
         _coordinator.UpdateGlobalGlassLive(LiveGlassStyle, _activeProfile?.WidgetBrightness ?? 1.0);
+        PersistActiveGlassStyle();
         PreviewSurfaceInvalidated?.Invoke();
     }
 
@@ -1765,6 +1979,8 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
         c["ShowCpu"] = ConfigStatsShowCpu ? "true" : "false";
         c["ShowRam"] = ConfigStatsShowRam ? "true" : "false";
         c["ShowNet"] = ConfigStatsShowNet ? "true" : "false";
+        c["ShowNetAdapters"] = ConfigStatsShowNetAdapters ? "true" : "false";
+        c["NetSwitchHotkey"] = ConfigStatsNetSwitchHotkey;
         c["ShowDisk"] = ConfigStatsShowDisk ? "true" : "false";
         c["ShowAllDrives"] = ConfigStatsShowAllDrives ? "true" : "false";
         c["ShowGpu"] = ConfigStatsShowGpu ? "true" : "false";
@@ -1873,6 +2089,7 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
         LiveGlassStyle.AccentHex = GlassAccentHex;
 
         _coordinator.UpdateGlobalGlassLive(LiveGlassStyle, _activeProfile?.WidgetBrightness ?? 1.0);
+        PersistActiveGlassStyle();
         PreviewSurfaceInvalidated?.Invoke();
     }
 
@@ -1883,10 +2100,17 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
         if (!string.Equals(SelectedMarketplaceCategory, "All", StringComparison.OrdinalIgnoreCase))
         {
             if (string.Equals(SelectedMarketplaceCategory, "Imported Packages", StringComparison.OrdinalIgnoreCase))
+            {
                 q = q.Where(e => !e.Manifest.Id.StartsWith("builtin.", StringComparison.OrdinalIgnoreCase) &&
-                                 !e.Manifest.Id.StartsWith("rainmeter.", StringComparison.OrdinalIgnoreCase));
+                                 !e.Manifest.Id.StartsWith("rainmeter.", StringComparison.OrdinalIgnoreCase) ||
+                                 string.Equals(e.Manifest.Category, "Imported Packages", StringComparison.OrdinalIgnoreCase));
+            }
             else
-                q = q.Where(e => string.Equals(e.Manifest.Category, SelectedMarketplaceCategory, StringComparison.OrdinalIgnoreCase));
+            {
+                q = q.Where(e => string.Equals(e.Manifest.Category, SelectedMarketplaceCategory, StringComparison.OrdinalIgnoreCase)
+                                 || (string.Equals(SelectedMarketplaceCategory, "Monitoring", StringComparison.OrdinalIgnoreCase) &&
+                                     e.Manifest.WidgetKind == WidgetKind.SystemStats));
+            }
         }
 
         if (!string.IsNullOrWhiteSpace(MarketplaceSearchText))
@@ -1896,6 +2120,7 @@ public sealed partial class WidgetStudioViewModel : ObservableObject
                 e.Manifest.Name.Contains(s, StringComparison.OrdinalIgnoreCase) ||
                 e.Manifest.Description.Contains(s, StringComparison.OrdinalIgnoreCase) ||
                 e.Manifest.Author.Contains(s, StringComparison.OrdinalIgnoreCase) ||
+                e.Manifest.Id.Contains(s, StringComparison.OrdinalIgnoreCase) ||
                 e.Manifest.Tags.Any(t => t.Contains(s, StringComparison.OrdinalIgnoreCase)));
         }
 

@@ -12,6 +12,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using DuoWall.App.Helpers;
+using DuoWall.App.Services;
 using DuoWall.App.Windows;
 using DuoWall.Core.Services;
 using DuoWall.Core.Theming;
@@ -79,6 +80,7 @@ public sealed class WidgetContentControl : UserControl
     private TextBlock? _statsRamVal;
     private ProgressBar? _statsRamBar;
     private TextBlock? _statsNetVal;
+    private WrapPanel? _statsAdaptersHost;
     private TextBlock? _statsDiskVal;
     private TextBlock? _statsGpuVal;
     private TextBlock? _statsThermalVal;
@@ -112,11 +114,24 @@ public sealed class WidgetContentControl : UserControl
     public event Action? ToggleVideoPlaybackRequested;
     public event Action<DateTime>? CalendarDateClicked;
     public event Action<ShortcutDockItem>? ShortcutLaunchRequested;
+    public event Action<string>? NetworkAdapterSwitchRequested;
 
     public WidgetContentControl()
     {
         _glassSurface.Content = _outerPaddingHost;
         Content = _glassSurface;
+        NetworkAdapterService.AdaptersChanged += OnAdaptersChanged;
+    }
+
+    private void OnAdaptersChanged()
+    {
+        Dispatcher.BeginInvoke(() =>
+        {
+            if (_widget.Kind == WidgetKind.SystemStats && _statsAdaptersHost != null && _statsAdaptersHost.Visibility == Visibility.Visible)
+            {
+                RebuildNetworkAdapterButtons(NetworkAdapterService.GetCachedAdapters());
+            }
+        });
     }
 
     public WidgetInstance CurrentWidget => _widget;
@@ -938,6 +953,7 @@ public sealed class WidgetContentControl : UserControl
         _statsRamVal = new TextBlock { FontFamily = ff, FontSize = 11.5, FontWeight = FontWeights.SemiBold };
         _statsRamBar = new ProgressBar { Height = 5, Minimum = 0, Maximum = 100, Margin = new Thickness(0, 2, 0, 6), Background = new SolidColorBrush(Color.FromArgb(55, 255, 255, 255)), Visibility = showBars ? Visibility.Visible : Visibility.Collapsed };
         _statsNetVal = new TextBlock { FontFamily = ff, FontSize = 11, Margin = new Thickness(0, 1, 0, 2) };
+        _statsAdaptersHost = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 3, 0, 4) };
         _statsDiskVal = new TextBlock { FontFamily = ff, FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 1, 0, 2) };
         _statsGpuVal = new TextBlock { FontFamily = ff, FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 1, 0, 2) };
         _statsThermalVal = new TextBlock { FontFamily = ff, FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 1, 0, 2) };
@@ -949,6 +965,7 @@ public sealed class WidgetContentControl : UserControl
         stack.Children.Add(_statsRamVal);
         stack.Children.Add(_statsRamBar);
         stack.Children.Add(_statsNetVal);
+        stack.Children.Add(_statsAdaptersHost);
         stack.Children.Add(_statsDiskVal);
         stack.Children.Add(_statsGpuVal);
         stack.Children.Add(_statsThermalVal);
@@ -1814,7 +1831,7 @@ public sealed class WidgetContentControl : UserControl
         }
     }
 
-    private void RefreshDynamicValues()
+    public void RefreshDynamicValues()
     {
         Color primary = PrimaryTextColor();
         Color secondary = SecondaryTextColor();
@@ -1966,6 +1983,7 @@ public sealed class WidgetContentControl : UserControl
                 bool showCpu = GetBoolConfig("ShowCpu", true);
                 bool showRam = GetBoolConfig("ShowRam", true);
                 bool showNet = GetBoolConfig("ShowNet", true);
+                bool showNetAdapters = GetBoolConfig("ShowNetAdapters", true);
                 bool showDisk = GetBoolConfig("ShowDisk", true);
                 bool showAllDrives = GetBoolConfig("ShowAllDrives", false);
                 bool showGpu = GetBoolConfig("ShowGpu", true);
@@ -1991,6 +2009,14 @@ public sealed class WidgetContentControl : UserControl
                 _statsRamVal.Visibility = showRam ? Visibility.Visible : Visibility.Collapsed;
                 _statsRamBar.Visibility = showRam && showBars ? Visibility.Visible : Visibility.Collapsed;
                 _statsNetVal.Visibility = showNet ? Visibility.Visible : Visibility.Collapsed;
+                if (_statsAdaptersHost != null)
+                {
+                    _statsAdaptersHost.Visibility = (showNet && showNetAdapters) ? Visibility.Visible : Visibility.Collapsed;
+                    if (showNet && showNetAdapters)
+                    {
+                        RebuildNetworkAdapterButtons(NetworkAdapterService.GetCachedAdapters());
+                    }
+                }
                 _statsDiskVal.Visibility = showDisk ? Visibility.Visible : Visibility.Collapsed;
                 _statsGpuVal.Visibility = showGpu ? Visibility.Visible : Visibility.Collapsed;
                 _statsThermalVal.Visibility = showTemps ? Visibility.Visible : Visibility.Collapsed;
@@ -2509,6 +2535,107 @@ public sealed class WidgetContentControl : UserControl
                 Foreground = new SolidColorBrush(entry.Kind == CalendarAgendaEntryKind.Reminder ? accent : primary)
             };
             _agendaListHost.Children.Add(tb);
+        }
+    }
+
+    private void RebuildNetworkAdapterButtons(IReadOnlyList<NetworkAdapterInfo> adapters)
+    {
+        if (_statsAdaptersHost == null) return;
+        _statsAdaptersHost.Children.Clear();
+
+        if (adapters == null || adapters.Count == 0) return;
+
+        var ff = ResolveFontFamily();
+        bool isSwitching = NetworkAdapterService.IsSwitching;
+        string? switchingTarget = NetworkAdapterService.SwitchingToAdapterName;
+
+        foreach (var adapter in adapters)
+        {
+            bool isCurrentActive = adapter.IsActive; // Enabled and Connected
+            bool isSwitchingThis = isSwitching && string.Equals(switchingTarget, adapter.Name, StringComparison.OrdinalIgnoreCase);
+
+            var btn = new Button
+            {
+                Margin = new Thickness(0, 0, 6, 4),
+                Padding = new Thickness(8, 2.5, 8, 2.5),
+                Cursor = Cursors.Hand,
+                ToolTip = isCurrentActive
+                    ? $"{adapter.Name} (Active & Connected)\n{adapter.Description}"
+                    : (adapter.IsEnabled
+                        ? $"{adapter.Name} (Enabled, Connecting/Disconnected)\n{adapter.Description}"
+                        : $"{adapter.Name} (Disabled)\nClick to enable and isolate this connection")
+            };
+
+            var template = new ControlTemplate(typeof(Button));
+            var borderFactory = new FrameworkElementFactory(typeof(Border));
+            borderFactory.Name = "ButtonBorder";
+            borderFactory.SetValue(Border.CornerRadiusProperty, new CornerRadius(6));
+
+            if (isCurrentActive)
+            {
+                // Enabled and Connected: Light up green!
+                borderFactory.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromArgb(60, 16, 185, 129)));
+                borderFactory.SetValue(Border.BorderBrushProperty, new SolidColorBrush(Color.FromRgb(34, 197, 94)));
+                borderFactory.SetValue(Border.BorderThicknessProperty, new Thickness(1.5));
+                borderFactory.SetValue(UIElement.EffectProperty, new DropShadowEffect
+                {
+                    Color = Color.FromRgb(34, 197, 94),
+                    BlurRadius = 8,
+                    ShadowDepth = 0,
+                    Opacity = 0.8
+                });
+            }
+            else
+            {
+                // Inactive / Disabled: Transparent glass button
+                borderFactory.SetValue(Border.BackgroundProperty, new SolidColorBrush(Color.FromArgb(24, 255, 255, 255)));
+                borderFactory.SetValue(Border.BorderBrushProperty, new SolidColorBrush(Color.FromArgb(65, 255, 255, 255)));
+                borderFactory.SetValue(Border.BorderThicknessProperty, new Thickness(1));
+                borderFactory.SetValue(UIElement.EffectProperty, null);
+            }
+
+            var contentPresenterFactory = new FrameworkElementFactory(typeof(ContentPresenter));
+            contentPresenterFactory.SetValue(ContentPresenter.HorizontalAlignmentProperty, HorizontalAlignment.Center);
+            contentPresenterFactory.SetValue(ContentPresenter.VerticalAlignmentProperty, VerticalAlignment.Center);
+            borderFactory.AppendChild(contentPresenterFactory);
+
+            template.VisualTree = borderFactory;
+            btn.Template = template;
+
+            var textBlock = new TextBlock
+            {
+                FontFamily = ff,
+                FontSize = 10.5,
+                FontWeight = isCurrentActive ? FontWeights.Bold : FontWeights.SemiBold,
+                Foreground = isCurrentActive
+                    ? new SolidColorBrush(Color.FromRgb(220, 252, 231))
+                    : new SolidColorBrush(SecondaryTextColor())
+            };
+
+            if (isSwitchingThis)
+            {
+                textBlock.Text = $"⏳ {adapter.Name}";
+            }
+            else if (isCurrentActive)
+            {
+                textBlock.Text = $"● {adapter.Name}";
+            }
+            else
+            {
+                textBlock.Text = adapter.Name;
+            }
+
+            btn.Content = textBlock;
+
+            string targetName = adapter.Name;
+            btn.Click += async (_, _) =>
+            {
+                if (NetworkAdapterService.IsSwitching) return;
+                NetworkAdapterSwitchRequested?.Invoke(targetName);
+                await NetworkAdapterService.SwitchToAdapterAsync(targetName);
+            };
+
+            _statsAdaptersHost.Children.Add(btn);
         }
     }
 

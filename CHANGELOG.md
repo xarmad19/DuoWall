@@ -34,6 +34,13 @@ Version 2.0.0 represents a massive leap forward for **DuoWall by SRMD**, transfo
 ---
 
 ### 🧩 Widget Marketplace & Glass Desktop Widgets
+- **Win + D Desktop Pinning (Never Minimize)**:
+  - Widget hosts now integrate into the desktop shell hierarchy by attaching ownership to `SHELLDLL_DefView` / `Progman` via Win32 `GWLP_HWNDPARENT`.
+  - Pressing `Win + D` (Show Desktop) minimizes all open windows while desktop widgets remain strictly pinned to the desktop layer behind applications.
+  - Win32 `WndProc` intercepts minimize commands (`SC_MINIMIZE`), suppresses shell hide flags (`SWP_HIDEWINDOW`), and asserts bottom desktop Z-order.
+- **Glass Theme Persistence Across PC Restarts**:
+  - Full persistence of active glass presets and custom slider tweaks via serialized JSON in `AppSettings` and `DesktopProfile`.
+  - DuoWall automatically remembers and restores whichever glass theme (Dark Glass, Midnight Glass, Obsidian, Cyber HUD, or custom color tints/blur values) was active before restart, preventing any fallback to the default white Frosted Glass.
 - **Renamed Tab**: Updated navigation to **Widget Marketplace** with integrated widget catalog.
 - **Direct "Edit" Button**:
   - If a widget is already added to the desktop, an **Edit** button appears next to "Add to Desktop" on its marketplace card, opening its configuration immediately.

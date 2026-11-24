@@ -31,6 +31,7 @@ public sealed class DesktopOverlayCoordinator : IDisposable
     private readonly SystemTelemetryReader _telemetryReader = new();
     private readonly DesktopContextMonitor _contextMonitor = new();
     private readonly ProfileEvaluationEngine _profileEngine = new();
+    private readonly GlobalHotkeyManager _hotkeyManager = new();
 
     private readonly Dictionary<string, DesktopWidgetHostWindow> _widgetWindows = new(StringComparer.OrdinalIgnoreCase);
     private readonly DispatcherTimer _secondTimer;
@@ -91,8 +92,11 @@ public sealed class DesktopOverlayCoordinator : IDisposable
             Interval = TimeSpan.FromMinutes(20)
         };
         _weatherTimer.Tick += async (_, _) => await RefreshWeatherAsync();
+
+        NetworkAdapterService.AdaptersChanged += OnAdaptersChanged;
     }
 
+    public GlobalHotkeyManager HotkeyManager => _hotkeyManager;
     public WeatherSnapshot? LatestWeather => _latestWeather;
     public string WeatherStatus => _weatherStatus;
     public TelemetrySnapshot? LatestTelemetry => _latestTelemetry;
@@ -298,6 +302,11 @@ public sealed class DesktopOverlayCoordinator : IDisposable
                 host.ContentControl.ToggleVideoPlaybackRequested += () => _videoWindow?.ToggleUserPause();
                 host.ContentControl.CalendarDateClicked += OpenCalendarDateModal;
                 host.ContentControl.ShortcutLaunchRequested += LaunchShortcutItem;
+                host.ContentControl.NetworkAdapterSwitchRequested += async adapterName =>
+                {
+                    await NetworkAdapterService.SwitchToAdapterAsync(adapterName);
+                    StatusMessageRaised?.Invoke($"Network switched to adapter '{adapterName}'.");
+                };
                 _widgetWindows[widget.InstanceId] = host;
             }
 
@@ -340,6 +349,45 @@ public sealed class DesktopOverlayCoordinator : IDisposable
             _widgetWindows[staleId].Close();
             _widgetWindows.Remove(staleId);
         }
+
+        UpdateHotkeys();
+    }
+
+    public void UpdateNetSwitchHotkey(string? hotkey)
+    {
+        if (!string.IsNullOrWhiteSpace(hotkey))
+        {
+            _hotkeyManager.Register(hotkey, async () =>
+            {
+                await NetworkAdapterService.CycleNextAdapterAsync();
+                StatusMessageRaised?.Invoke("Cycled network adapter connection via shortcut.");
+            });
+        }
+        else
+        {
+            _hotkeyManager.Unregister();
+        }
+    }
+
+    private void UpdateHotkeys()
+    {
+        var sysWidget = _activeProfile?.Widgets.FirstOrDefault(w => w.IsVisible && w.Kind == WidgetKind.SystemStats);
+        string? hotkey = sysWidget != null && sysWidget.Config.TryGetValue("NetSwitchHotkey", out var hk) ? hk : null;
+        UpdateNetSwitchHotkey(hotkey);
+    }
+
+    private void OnAdaptersChanged()
+    {
+        Application.Current?.Dispatcher.BeginInvoke(() =>
+        {
+            foreach (var host in _widgetWindows.Values)
+            {
+                if (host.ContentControl.CurrentWidget.Kind == WidgetKind.SystemStats)
+                {
+                    host.ContentControl.RefreshDynamicValues();
+                }
+            }
+        });
     }
 
     private ImageSource? BuildSliceForWidget(MonitorInfo? targetMonitor, WidgetInstance widget, GlassmorphismStyle style)
@@ -417,9 +465,21 @@ public sealed class DesktopOverlayCoordinator : IDisposable
 
         foreach (var host in _widgetWindows.Values)
         {
+            if (host.WindowState == WindowState.Minimized)
+            {
+                host.WindowState = WindowState.Normal;
+                GlassBackdropHelper.SendToBottomZOrder(host.Hwnd);
+            }
+
             host.ContentControl.TickSecond(needsTelemetry ? _latestTelemetry : null);
             if (_videoWindow != null)
                 host.ContentControl.UpdateVideoStatus(_videoWindow.IsEffectivelyPlaying, _videoWindow.StatusSummary);
+        }
+
+        if (_videoWindow != null && _videoWindow.WindowState == WindowState.Minimized)
+        {
+            _videoWindow.WindowState = WindowState.Normal;
+            GlassBackdropHelper.SendToBottomZOrder(_videoWindow.Hwnd);
         }
 
         CheckScheduledCalendarReminders();
@@ -698,6 +758,7 @@ public sealed class DesktopOverlayCoordinator : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        _hotkeyManager.Dispose();
         _secondTimer.Stop();
         _contextTimer.Stop();
         _weatherTimer.Stop();

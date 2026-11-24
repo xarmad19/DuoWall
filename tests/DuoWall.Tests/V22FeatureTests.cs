@@ -319,6 +319,70 @@ public sealed class V22FeatureTests : IDisposable
         Assert.Equal("true", clone.Config["ShowVolume"]);
     }
 
+    [Fact]
+    public void AppSettings_GlassThemePersistence_PreservesCustomStyleAcrossRestarts()
+    {
+        var db = new DuoWallDatabase(Path.Combine(_tempDir, "glass_settings.db"));
+        var settings = new AppSettings
+        {
+            ActiveGlassPresetId = "midnight-glass",
+            ActiveGlassCustomJson = "{\"surfaceTheme\":0,\"backgroundTintHex\":\"#0B0F19\",\"backgroundTransparency\":0.85}"
+        };
+
+        db.SaveSettings(settings);
+        var loaded = db.LoadSettings();
+
+        Assert.Equal("midnight-glass", loaded.ActiveGlassPresetId);
+        Assert.NotNull(loaded.ActiveGlassCustomJson);
+        Assert.Contains("#0B0F19", loaded.ActiveGlassCustomJson);
+        Assert.NotEqual("frosted-glass", loaded.ActiveGlassPresetId);
+    }
+
+    [Fact]
+    public void DesktopProfile_CustomGlassStyleJson_PreservedAcrossCloneAndDatabase()
+    {
+        var db = new DuoWallDatabase(Path.Combine(_tempDir, "glass_profile.db"));
+        var profile = new DesktopProfile
+        {
+            ProfileId = "test-custom-profile",
+            Name = "Dark Obsidian Profile",
+            GlassPresetName = "Obsidian Glass",
+            CustomGlassStyleJson = "{\"surfaceTheme\":0,\"backgroundTintHex\":\"#050811\",\"cornerRadius\":24.0}"
+        };
+
+        var clone = profile.Clone();
+        Assert.Equal("Obsidian Glass", clone.GlassPresetName);
+        Assert.Equal(profile.CustomGlassStyleJson, clone.CustomGlassStyleJson);
+
+        db.SaveDesktopProfile(profile);
+        var loadedProfiles = db.LoadDesktopProfilesEnsureDefaults();
+        var match = loadedProfiles.FirstOrDefault(p => p.ProfileId == "test-custom-profile");
+
+        Assert.NotNull(match);
+        Assert.Equal("Obsidian Glass", match.GlassPresetName);
+        Assert.NotNull(match.CustomGlassStyleJson);
+        Assert.Contains("#050811", match.CustomGlassStyleJson);
+    }
+
+    [Fact]
+    public void DuoWallLayoutPresetBackup_IncludesAndRestoresGlassCustomJson()
+    {
+        var backup = new DuoWallLayoutPresetBackup
+        {
+            PresetName = "Cyberpunk Glass Layout",
+            ActiveGlassPresetId = "cyber-hud",
+            ActiveGlassCustomJson = "{\"accentHex\":\"#00F0FF\",\"backgroundTintHex\":\"#0A0E1A\"}"
+        };
+
+        string json = JsonSerializer.Serialize(backup);
+        var restored = JsonSerializer.Deserialize<DuoWallLayoutPresetBackup>(json);
+
+        Assert.NotNull(restored);
+        Assert.Equal("cyber-hud", restored.ActiveGlassPresetId);
+        Assert.NotNull(restored.ActiveGlassCustomJson);
+        Assert.Contains("#00F0FF", restored.ActiveGlassCustomJson);
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_tempDir, recursive: true); } catch { }

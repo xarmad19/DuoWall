@@ -71,7 +71,48 @@ public sealed class LocalWidgetMarketplaceProvider : IWidgetMarketplaceProvider
             MakeEntry("builtin.system-stats", "System Telemetry HUD", "Monitoring", WidgetKind.SystemStats, 5.0, 21500, true,
                 "Real-time CPU, RAM, GPU, Network Rx/Tx, Storage capacity, and hardware temperature sensors.",
                 GlassmorphismStyle.GetPreset("Midnight Glass"),
-                new() { ["Mode"] = "Detailed" }),
+                new() { ["Mode"] = "Detailed", ["ShowNetAdapters"] = "true", ["NetSwitchHotkey"] = "Ctrl+Alt+N" }),
+
+            MakeEntry("builtin.system-network", "System & Network", "Monitoring", WidgetKind.SystemStats, 5.0, 31200, true,
+                "Real-time system telemetry and transparent glass network adapter switcher. Click any adapter to isolate active connection or toggle via global shortcut.",
+                new GlassmorphismStyle
+                {
+                    Id = "glass-transparent-system-net",
+                    Name = "Transparent Glass",
+                    IsBuiltIn = true,
+                    BackgroundTransparency = 0.47,
+                    BackgroundTintHex = "#1E293B",
+                    GradientSecondaryHex = "#1E293B",
+                    BackgroundOpacity = 0.05,
+                    BackgroundBlurIntensity = 14.6,
+                    EnableBackdropBlur = true,
+                    BorderTransparency = 0.91,
+                    BorderThickness = 2.0,
+                    BorderColorHex = "#94A3B8",
+                    CornerRadius = 24.0,
+                    InnerShadowIntensity = 0.77,
+                    OuterShadowIntensity = 0.76,
+                    GlowIntensity = 0.50,
+                    HighlightIntensity = 0.47,
+                    AppearanceVariant = GlassAppearanceVariant.Frosted,
+                    SurfaceTheme = WidgetSurfaceTheme.Glassmorphism,
+                    TextPrimaryHex = "#F8FAFC",
+                    TextSecondaryHex = "#94A3B8",
+                    AccentHex = "#38BDF8"
+                },
+                new()
+                {
+                    ["StatsLayout"] = "Compact",
+                    ["ShowCpu"] = "true",
+                    ["ShowRam"] = "true",
+                    ["ShowNet"] = "true",
+                    ["ShowDisk"] = "true",
+                    ["ShowGpu"] = "true",
+                    ["ShowTemps"] = "true",
+                    ["ShowNetAdapters"] = "true",
+                    ["NetSwitchHotkey"] = "Ctrl+Alt+N"
+                },
+                new[] { "Monitoring", "Network", "Adapter", "Adapters", "System", "Telemetry", "System & Network", "Glassmorphism" }),
 
             MakeEntry("builtin.quick-settings", "Apple Quick Settings Control Center", "System & Utilities", WidgetKind.QuickSettings, 5.0, 24600, true,
                 "macOS / iOS styled Control Center in frosted glass with Wi-Fi, Bluetooth, live Master Volume slider, Display, Control Panel, Task Manager, Settings, and Sound Mixer.",
@@ -138,8 +179,18 @@ public sealed class LocalWidgetMarketplaceProvider : IWidgetMarketplaceProvider
 
     private static MarketplaceCatalogEntry MakeEntry(
         string id, string name, string category, WidgetKind kind, double rating, int downloads, bool featured,
-        string desc, GlassmorphismStyle glass, Dictionary<string, string> defaults)
+        string desc, GlassmorphismStyle glass, Dictionary<string, string> defaults, IEnumerable<string>? extraTags = null)
     {
+        var tags = new List<string> { category, kind.ToString(), "Glassmorphism" };
+        if (extraTags != null)
+        {
+            foreach (var t in extraTags)
+            {
+                if (!tags.Contains(t, StringComparer.OrdinalIgnoreCase))
+                    tags.Add(t);
+            }
+        }
+
         return new MarketplaceCatalogEntry
         {
             IsFeatured = featured,
@@ -159,7 +210,7 @@ public sealed class LocalWidgetMarketplaceProvider : IWidgetMarketplaceProvider
                 WidgetKind = kind,
                 GlassStyle = glass,
                 DefaultSettings = defaults,
-                Tags = new List<string> { category, kind.ToString(), "Glassmorphism" }
+                Tags = tags
             }
         };
     }

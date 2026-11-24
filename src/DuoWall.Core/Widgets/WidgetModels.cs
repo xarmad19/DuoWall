@@ -253,6 +253,7 @@ public sealed class DesktopProfile
     public int Priority { get; set; } = 10;
 
     public string GlassPresetName { get; set; } = "Frosted Glass";
+    public string? CustomGlassStyleJson { get; set; }
     public bool UseDarkTheme { get; set; } = true;
     public double WidgetBrightness { get; set; } = 1.0;
     public bool MinimalAnimations { get; set; }
@@ -277,6 +278,7 @@ public sealed class DesktopProfile
         IsEnabled = IsEnabled,
         Priority = Priority,
         GlassPresetName = GlassPresetName,
+        CustomGlassStyleJson = CustomGlassStyleJson,
         UseDarkTheme = UseDarkTheme,
         WidgetBrightness = WidgetBrightness,
         MinimalAnimations = MinimalAnimations,

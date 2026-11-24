@@ -51,6 +51,7 @@ public sealed class AppSettings
     public string ActiveDesktopProfileId { get; set; } = "preset-work";
     public string? ManualProfileOverrideId { get; set; }
     public string ActiveGlassPresetId { get; set; } = "frosted-glass";
+    public string? ActiveGlassCustomJson { get; set; }
     public WallpaperColorAdaptationMode ColorAdaptationMode { get; set; } = WallpaperColorAdaptationMode.Suggested;
 
     public string WeatherCity { get; set; } = "Lahore";
@@ -134,6 +135,7 @@ public sealed class DuoWallLayoutPresetBackup
     public string? LiveVideoPath { get; set; }
     public string? LiveVideoStillPath { get; set; }
     public string ActiveGlassPresetId { get; set; } = "frosted-glass";
+    public string? ActiveGlassCustomJson { get; set; }
     public string WidgetAccentColorHex { get; set; } = "#FF38BDF8";
     public bool AutoWidgetAccentFromWallpaper { get; set; } = true;
     public PlacementSettings Placement { get; set; } = new();

@@ -60,6 +60,7 @@ public partial class PanoramicVideoBackdropWindow : Window
 
     public bool IsEffectivelyPlaying { get; private set; }
     public string StatusSummary { get; private set; } = "Idle";
+    public IntPtr Hwnd => _hwnd;
 
     public PanoramicVideoBackdropWindow()
     {
@@ -72,6 +73,7 @@ public partial class PanoramicVideoBackdropWindow : Window
         base.OnSourceInitialized(e);
         _hwnd = new WindowInteropHelper(this).Handle;
         GlassBackdropHelper.ConfigureDesktopOverlayWindow(_hwnd, excludeFromAeroPeek: false);
+        GlassBackdropHelper.AttachToDesktopShellOwner(_hwnd);
         GlassBackdropHelper.SetClickThrough(_hwnd, true);
         GlassBackdropHelper.SendToBottomZOrder(_hwnd);
     }

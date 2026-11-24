@@ -210,6 +210,92 @@ public sealed class PackageServiceTests : IDisposable
         Assert.Equal("sample_4k", scanned[0].Title);
     }
 
+    [Fact]
+    public async Task SystemAndNetworkWidgetPackage_ContainsNetworkAdapterConfiguration()
+    {
+        string dwwpPath = @"d:\Downloads\System & Network.widget.dwwp";
+        if (!File.Exists(dwwpPath)) return;
+
+        var svc = new WidgetPackageService();
+        string installRoot = Path.Combine(_tempDir, "system_network_install");
+        var res = await svc.ImportPackageAsync(dwwpPath, installRoot);
+
+        Assert.True(res.Success, res.ErrorMessage);
+        Assert.NotNull(res.Manifest);
+
+        var manifest = res.Manifest!;
+        Assert.Equal(WidgetKind.SystemStats, manifest.WidgetKind);
+        Assert.True(manifest.DefaultSettings.TryGetValue("ShowNetAdapters", out string? showAdapters) && showAdapters == "true");
+        Assert.True(manifest.DefaultSettings.TryGetValue("NetSwitchHotkey", out string? hotkey) && hotkey == "Ctrl+Alt+N");
+
+        Assert.NotNull(manifest.WidgetTemplate);
+        Assert.True(manifest.WidgetTemplate.Config.TryGetValue("ShowNetAdapters", out string? tplAdapters) && tplAdapters == "true");
+        Assert.True(manifest.WidgetTemplate.Config.TryGetValue("NetSwitchHotkey", out string? tplHotkey) && tplHotkey == "Ctrl+Alt+N");
+        Assert.Equal(220, manifest.WidgetTemplate.Height);
+    }
+
+    [Fact]
+    public async Task Marketplace_Contains_SystemAndNetwork_WithTagsAndDefaults()
+    {
+        var catalog = await new LocalWidgetMarketplaceProvider().GetCatalogAsync();
+        var sysNet = catalog.FirstOrDefault(c => c.Manifest.Id == "builtin.system-network");
+        Assert.NotNull(sysNet);
+        Assert.Equal("System & Network", sysNet.Manifest.Name);
+        Assert.Equal("Monitoring", sysNet.Manifest.Category);
+        Assert.Equal(WidgetKind.SystemStats, sysNet.Manifest.WidgetKind);
+        Assert.True(sysNet.Manifest.DefaultSettings.TryGetValue("ShowNetAdapters", out string? show) && show == "true");
+        Assert.True(sysNet.Manifest.DefaultSettings.TryGetValue("NetSwitchHotkey", out string? hotkey) && hotkey == "Ctrl+Alt+N");
+        Assert.Contains(sysNet.Manifest.Tags, t => t.Equals("Network", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(sysNet.Manifest.Tags, t => t.Equals("Adapter", StringComparison.OrdinalIgnoreCase) || t.Equals("Adapters", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task InstallWidgetInUserDuoWall()
+    {
+        string dwwpPath = @"d:\Downloads\System & Network.widget.dwwp";
+        Assert.True(File.Exists(dwwpPath));
+
+        var svc = new WidgetPackageService();
+        string packagesRoot = DuoWall.Core.Models.AppSettings.GetDefaultPackagesDirectory();
+        var res = await svc.ImportPackageAsync(dwwpPath, packagesRoot);
+        Assert.True(res.Success, res.ErrorMessage);
+        Assert.NotNull(res.InstalledRecord);
+        Assert.NotNull(res.Manifest);
+
+        var db = new DuoWall.Core.Storage.DuoWallDatabase();
+        db.SaveInstalledPackage(res.InstalledRecord!);
+
+        var profiles = db.LoadDesktopProfilesEnsureDefaults();
+
+        foreach (var profile in profiles)
+        {
+            var existing = profile.Widgets.FirstOrDefault(w => w.Kind == WidgetKind.SystemStats || w.PackageId == res.Manifest.Id);
+            if (existing != null)
+            {
+                existing.PackageId = res.Manifest.Id;
+                existing.Title = res.Manifest.Name;
+                existing.Config["ShowNetAdapters"] = "true";
+                existing.Config["NetSwitchHotkey"] = "Ctrl+Alt+N";
+                if (existing.Height < 220) existing.Height = 220;
+            }
+            else if (profile.IsEnabled)
+            {
+                var w = (res.Manifest.WidgetTemplate ?? new WidgetInstance
+                {
+                    Kind = WidgetKind.SystemStats,
+                    Title = res.Manifest.Name,
+                    Height = 220,
+                    Width = 340
+                }).Clone(newInstanceId: true);
+                w.PackageId = res.Manifest.Id;
+                w.Config["ShowNetAdapters"] = "true";
+                w.Config["NetSwitchHotkey"] = "Ctrl+Alt+N";
+                profile.Widgets.Add(w);
+            }
+            db.SaveDesktopProfile(profile);
+        }
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_tempDir, recursive: true); } catch { }
