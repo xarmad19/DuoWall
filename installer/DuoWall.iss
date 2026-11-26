@@ -1,6 +1,8 @@
-; Script generated for DuoWall by SRMD v2.0.0
+; Script generated for DuoWall by SRMD
+#ifndef MyAppVersion
+#define MyAppVersion "2.0.1"
+#endif
 #define MyAppName "DuoWall by SRMD"
-#define MyAppVersion "2.0.0"
 #define MyAppPublisher "Syed Sarmad Iftikhar"
 #define MyAppURL "https://github.com/xarmad19/DuoWall"
 #define MyAppExeName "DuoWall.exe"
@@ -17,7 +19,7 @@ DefaultDirName={autopf}\DuoWall
 DefaultGroupName={#MyAppName}
 AllowNoIcons=yes
 OutputDir=..\publish
-OutputBaseFilename=DuoWall-v2.0.0-Setup
+OutputBaseFilename=DuoWall-v{#MyAppVersion}-Setup
 SetupIconFile=..\src\DuoWall.App\Assets\duowall.ico
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -25,6 +27,13 @@ WizardStyle=modern
 PrivilegesRequired=lowest
 ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\{#MyAppExeName}
+AppMutex=DuoWallBySRMD_SingleInstance_Mutex
+CloseApplications=yes
+CloseApplicationsFilter=*.exe
+RestartApplications=yes
+UsePreviousAppDir=yes
+UsePreviousGroup=yes
+UsePreviousTasks=yes
 
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
@@ -34,10 +43,10 @@ Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{
 Name: "autostart"; Description: "Start DuoWall automatically on Windows login"; GroupDescription: "Preferences:"; Flags: unchecked
 
 [Files]
-Source: "..\publish\DuoWall-Portable\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\publish\DuoWall-Portable\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs; Excludes: "{#MyAppExeName},*.pdb"
-Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion
-Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\publish\DuoWall-Portable\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion restartreplace
+Source: "..\publish\DuoWall-Portable\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs restartreplace; Excludes: "{#MyAppExeName},*.pdb"
+Source: "..\README.md"; DestDir: "{app}"; Flags: ignoreversion restartreplace
+Source: "..\LICENSE"; DestDir: "{app}"; Flags: ignoreversion restartreplace
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\{#MyAppExeName}"

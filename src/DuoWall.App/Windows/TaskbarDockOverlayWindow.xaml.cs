@@ -31,10 +31,16 @@ public partial class TaskbarDockOverlayWindow : Window
 
     private IntPtr _hwnd = IntPtr.Zero;
     private string _lastVisualKey = string.Empty;
+    private bool _isFullBar = false;
 
     public TaskbarDockOverlayWindow()
     {
         InitializeComponent();
+        StateChanged += (_, _) =>
+        {
+            if (WindowState == WindowState.Minimized)
+                WindowState = WindowState.Normal;
+        };
     }
 
     protected override void OnSourceInitialized(EventArgs e)
@@ -43,6 +49,7 @@ public partial class TaskbarDockOverlayWindow : Window
         _hwnd = new WindowInteropHelper(this).Handle;
         GlassBackdropHelper.ConfigureDesktopOverlayWindow(_hwnd, excludeFromAeroPeek: false);
         GlassBackdropHelper.SetClickThrough(_hwnd, true);
+        GlassBackdropHelper.AttachToDesktopShellOwner(_hwnd);
     }
 
     public void UpdateDockPhysicalRectAndStyle(
@@ -55,15 +62,23 @@ public partial class TaskbarDockOverlayWindow : Window
         GlassmorphismStyle style,
         ImageSource? wallpaperSlice,
         string visualStyleKey,
-        IntPtr placeBehindTrayHwnd)
+        IntPtr placeBehindTrayHwnd,
+        bool isFullBar = false)
     {
+        _isFullBar = isFullBar;
+        double currentMarginPad = isFullBar ? 0.0 : MarginPad;
+        if (DockRootGrid.Margin.Left != currentMarginPad)
+        {
+            DockRootGrid.Margin = new Thickness(currentMarginPad);
+        }
+
         double initDpi = Math.Max(1.0, fallbackDpi);
         if (!IsVisible)
         {
-            Left = physLeft / initDpi - MarginPad;
-            Top = physTop / initDpi - MarginPad;
-            Width = Math.Max(36, physWidth / initDpi) + MarginPad * 2;
-            Height = Math.Max(20, physHeight / initDpi) + MarginPad * 2;
+            Left = physLeft / initDpi - currentMarginPad;
+            Top = physTop / initDpi - currentMarginPad;
+            Width = Math.Max(36, physWidth / initDpi) + currentMarginPad * 2;
+            Height = Math.Max(20, physHeight / initDpi) + currentMarginPad * 2;
             Opacity = Math.Clamp(opacity, 0.0, 1.0);
             Show();
         }
@@ -77,10 +92,10 @@ public partial class TaskbarDockOverlayWindow : Window
             if (wpfDpi.DpiScaleY > 0.5) winDpiY = wpfDpi.DpiScaleY;
         }
 
-        double targetW = Math.Max(36, physWidth / winDpiX) + MarginPad * 2;
-        double targetH = Math.Max(20, physHeight / winDpiY) + MarginPad * 2;
-        double targetL = physLeft / winDpiX - MarginPad;
-        double targetT = physTop / winDpiY - MarginPad;
+        double targetW = Math.Max(36, physWidth / winDpiX) + currentMarginPad * 2;
+        double targetH = Math.Max(20, physHeight / winDpiY) + currentMarginPad * 2;
+        double targetL = physLeft / winDpiX - currentMarginPad;
+        double targetT = physTop / winDpiY - currentMarginPad;
         if (Math.Abs(Width - targetW) > 0.1) Width = targetW;
         if (Math.Abs(Height - targetH) > 0.1) Height = targetH;
         if (Math.Abs(Left - targetL) > 0.1) Left = targetL;
@@ -99,10 +114,10 @@ public partial class TaskbarDockOverlayWindow : Window
 
         if (_hwnd != IntPtr.Zero)
         {
-            int marginPxX = (int)Math.Round(MarginPad * winDpiX);
-            int marginPxY = (int)Math.Round(MarginPad * winDpiY);
+            int marginPxX = (int)Math.Round(currentMarginPad * winDpiX);
+            int marginPxY = (int)Math.Round(currentMarginPad * winDpiY);
             int winW = Math.Max(40, physWidth + marginPxX * 2);
-            int winH = Math.Max(24, physHeight + marginPxY * 2);
+            int winH = Math.Max(20, physHeight + marginPxY * 2);
             IntPtr insertAfter = placeBehindTrayHwnd != IntPtr.Zero ? placeBehindTrayHwnd : IntPtr.Zero;
             uint flags = SWP_NOACTIVATE | (placeBehindTrayHwnd == IntPtr.Zero ? 0x0004u : 0u);
             SetWindowPos(_hwnd, insertAfter, physLeft - marginPxX, physTop - marginPxY, winW, winH, flags);
@@ -121,8 +136,9 @@ public partial class TaskbarDockOverlayWindow : Window
             var wpfDpi = VisualTreeHelper.GetDpi(this);
             double winDpiX = wpfDpi.DpiScaleX > 0.5 ? wpfDpi.DpiScaleX : fallbackDpi;
             double winDpiY = wpfDpi.DpiScaleY > 0.5 ? wpfDpi.DpiScaleY : fallbackDpi;
-            int marginPxX = (int)Math.Round(MarginPad * winDpiX);
-            int marginPxY = (int)Math.Round(MarginPad * winDpiY);
+            double currentMarginPad = _isFullBar ? 0.0 : MarginPad;
+            int marginPxX = (int)Math.Round(currentMarginPad * winDpiX);
+            int marginPxY = (int)Math.Round(currentMarginPad * winDpiY);
             IntPtr insertAfter = placeBehindTrayHwnd != IntPtr.Zero ? placeBehindTrayHwnd : IntPtr.Zero;
             uint flags = SWP_NOSIZE | SWP_NOACTIVATE | (placeBehindTrayHwnd == IntPtr.Zero ? 0x0004u : 0u);
             SetWindowPos(_hwnd, insertAfter, physLeft - marginPxX, physTop - marginPxY, 0, 0, flags);

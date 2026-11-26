@@ -383,6 +383,55 @@ public sealed class V22FeatureTests : IDisposable
         Assert.Contains("#00F0FF", restored.ActiveGlassCustomJson);
     }
 
+    [Fact]
+    public void TaskbarSettings_UniversalGlass_ConfigurationRoundtrip()
+    {
+        var db = new DuoWallDatabase(Path.Combine(_tempDir, "taskbar_settings.db"));
+        var settings = db.LoadSettings();
+
+        settings.EnableTaskbarGlass = true;
+        settings.TaskbarAcrylicOpacity = 0.65;
+        settings.CenterTaskbarIcons = false;
+        settings.EnableTaskbarGlassDock = false;
+        db.SaveSettings(settings);
+
+        var reloaded = db.LoadSettings();
+        Assert.True(reloaded.EnableTaskbarGlass);
+        Assert.Equal(0.65, reloaded.TaskbarAcrylicOpacity, 2);
+        Assert.False(reloaded.CenterTaskbarIcons);
+        Assert.False(reloaded.EnableTaskbarGlassDock);
+    }
+
+    [Fact]
+    public void InnoSetupScript_DualInstallAndUpgradeDirectives_ConfiguredCorrectly()
+    {
+        string current = AppContext.BaseDirectory;
+        string? root = null;
+        for (int i = 0; i < 7; i++)
+        {
+            if (File.Exists(Path.Combine(current, "DuoWall.sln")))
+            {
+                root = current;
+                break;
+            }
+            string? parent = Path.GetDirectoryName(current);
+            if (parent == null) break;
+            current = parent;
+        }
+
+        Assert.NotNull(root);
+        string issPath = Path.Combine(root, "installer", "DuoWall.iss");
+        Assert.True(File.Exists(issPath), $"Expected DuoWall.iss to exist at {issPath}");
+
+        string issContent = File.ReadAllText(issPath);
+        Assert.Contains("AppMutex=DuoWallBySRMD_SingleInstance_Mutex", issContent);
+        Assert.Contains("CloseApplications=yes", issContent);
+        Assert.Contains("RestartApplications=yes", issContent);
+        Assert.Contains("UsePreviousAppDir=yes", issContent);
+        Assert.Contains("restartreplace", issContent);
+        Assert.Contains("#ifndef MyAppVersion", issContent);
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_tempDir, recursive: true); } catch { }

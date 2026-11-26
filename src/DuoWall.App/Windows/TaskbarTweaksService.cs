@@ -86,7 +86,20 @@ public sealed class TaskbarTweaksService : IDisposable
         public ImageSource? CachedSlice;
         public MonitorInfo? TargetMonitor;
         public double DpiScale = 1.0;
+        public bool IsFullBar;
     }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MARGINS
+    {
+        public int cxLeftWidth;
+        public int cxRightWidth;
+        public int cyTopHeight;
+        public int cyBottomHeight;
+    }
+
+    [DllImport("dwmapi.dll")]
+    private static extern int DwmExtendFrameIntoClientArea(IntPtr hWnd, ref MARGINS pMarInset);
 
     private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
     private delegate void WinEventDelegate(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime);
@@ -257,7 +270,8 @@ public sealed class TaskbarTweaksService : IDisposable
             if (!_reapplyTimer.IsEnabled)
                 _reapplyTimer.Start();
 
-            bool trackMotion = _settings.CenterTaskbarIcons && _settings.EnableTaskbarGlassDock;
+            bool trackMotion = (_settings.EnableTaskbarGlass && !_settings.MakeTaskbarInvisible) ||
+                               (_settings.CenterTaskbarIcons && _settings.EnableTaskbarGlassDock);
             if (trackMotion)
             {
                 EnsureWinEventHookInstalled();
@@ -312,7 +326,10 @@ public sealed class TaskbarTweaksService : IDisposable
 
     private void OnTrayWinEvent(IntPtr hWinEventHook, uint eventType, IntPtr hwnd, int idObject, int idChild, uint dwEventThread, uint dwmsEventTime)
     {
-        if (_disposed || !_settings.CenterTaskbarIcons || !_settings.EnableTaskbarGlassDock) return;
+        if (_disposed) return;
+        bool hasActiveDock = (_settings.EnableTaskbarGlass && !_settings.MakeTaskbarInvisible) ||
+                             (_settings.CenterTaskbarIcons && _settings.EnableTaskbarGlassDock);
+        if (!hasActiveDock) return;
         if (!_dockWindows.ContainsKey(hwnd)) return;
 
         if (!_syncPending)
@@ -328,7 +345,10 @@ public sealed class TaskbarTweaksService : IDisposable
 
     private void SyncDockPositionsFast()
     {
-        if (_disposed || !_settings.CenterTaskbarIcons || !_settings.EnableTaskbarGlassDock) return;
+        if (_disposed) return;
+        bool hasActiveDock = (_settings.EnableTaskbarGlass && !_settings.MakeTaskbarInvisible) ||
+                             (_settings.CenterTaskbarIcons && _settings.EnableTaskbarGlassDock);
+        if (!hasActiveDock) return;
 
         foreach (var kv in _dockWindows)
         {
@@ -348,7 +368,9 @@ public sealed class TaskbarTweaksService : IDisposable
             double visibleFrac = Math.Clamp((monBottom - trayRect.Top) / trayH, 0.0, 1.0);
             double opacity = visibleFrac <= 0.08 ? 0.0 : Math.Clamp((visibleFrac - 0.08) / 0.72, 0.0, 1.0);
 
-            int physDockTop = trayRect.Top + (trayRect.Height - cache.CachedHeightPx) / 2;
+            int physDockTop = cache.IsFullBar
+                ? trayRect.Top
+                : trayRect.Top + (trayRect.Height - cache.CachedHeightPx) / 2;
             dockWin.UpdatePositionPhysicalFast(cache.CachedLeftPx, physDockTop, dpi, opacity, trayHwnd);
         }
     }
@@ -381,37 +403,110 @@ public sealed class TaskbarTweaksService : IDisposable
                     ShowWindow(tray.Hwnd, SW_HIDE);
             }
 
-            // 2. Center Taskbar Icons + Resizable Glass Dock Backdrop + Glass / Invisible Taskbar
+            // 2. Center Taskbar Icons + Resizable Glass Dock Backdrop + Universal Glass / Invisible Taskbar
             var activeDockTrays = new HashSet<IntPtr>();
             var monitors = _displayDetector.DetectMonitors();
+
+            bool showFullTaskbarGlass = _settings.EnableTaskbarGlass && !_settings.MakeTaskbarInvisible;
+            bool showDockBackdrop = !_settings.MakeTaskbarInvisible && !showFullTaskbarGlass && _settings.CenterTaskbarIcons && _settings.EnableTaskbarGlassDock;
+            bool makeNativeTransparent = showFullTaskbarGlass || showDockBackdrop || _settings.MakeTaskbarInvisible;
 
             foreach (var tray in trays)
             {
                 if (!IsWindowVisible(tray.Hwnd)) continue;
+                if (!GetWindowRect(tray.Hwnd, out var trayRect)) continue;
 
-                bool showDockHere = _settings.CenterTaskbarIcons && _settings.EnableTaskbarGlassDock;
-
-                if (_settings.MakeTaskbarInvisible || showDockHere)
+                if (makeNativeTransparent)
                 {
-                    SetTrayAccentPolicy(tray.Hwnd, AccentState.ACCENT_ENABLE_TRANSPARENTGRADIENT, 0x01000000);
-                }
-                else if (_settings.EnableTaskbarGlass)
-                {
-                    uint abgr = ComputeTaskbarGlassAbgr(_glassStyle, _settings.TaskbarAcrylicOpacity);
-                    SetTrayAccentPolicy(tray.Hwnd, AccentState.ACCENT_ENABLE_ACRYLICBLURBEHIND, abgr);
+                    MakeTaskbarTransparent(tray.Hwnd);
                 }
                 else
                 {
-                    SetTrayAccentPolicy(tray.Hwnd, AccentState.ACCENT_DISABLED, 0);
+                    RestoreTaskbarOpaque(tray.Hwnd);
                 }
 
-                if (_settings.CenterTaskbarIcons && GetWindowRect(tray.Hwnd, out var trayRect))
+                double dpi = Math.Max(96.0, GetDpiForWindow(tray.Hwnd)) / 96.0;
+                var targetMon = monitors.FirstOrDefault(m =>
+                    trayRect.Left >= m.Bounds.X - 40 && trayRect.Left < m.Bounds.Right + 40);
+
+                double monBottom = targetMon != null ? targetMon.Bounds.Bottom : trayRect.Bottom;
+                double visibleFrac = Math.Clamp((monBottom - trayRect.Top) / Math.Max(28.0, trayRect.Height), 0.0, 1.0);
+                double dockOpacity = visibleFrac <= 0.08 ? 0.0 : Math.Clamp((visibleFrac - 0.08) / 0.72, 0.0, 1.0);
+
+                if (showFullTaskbarGlass)
+                {
+                    activeDockTrays.Add(tray.Hwnd);
+
+                    if (!_dockWindows.TryGetValue(tray.Hwnd, out var dockWin))
+                    {
+                        dockWin = new TaskbarDockOverlayWindow();
+                        _dockWindows[tray.Hwnd] = dockWin;
+                    }
+
+                    if (!_dockCaches.TryGetValue(tray.Hwnd, out var cache))
+                    {
+                        cache = new DockLayoutCache();
+                        _dockCaches[tray.Hwnd] = cache;
+                    }
+
+                    var fullBarGlassStyle = _glassStyle.Clone();
+                    fullBarGlassStyle.CornerRadius = 0;
+                    fullBarGlassStyle.OuterShadowIntensity = 0;
+                    fullBarGlassStyle.GlowIntensity = 0;
+                    if (_settings.TaskbarAcrylicOpacity > 0.01)
+                    {
+                        fullBarGlassStyle.BackgroundOpacity = Math.Clamp(_settings.TaskbarAcrylicOpacity, 0.05, 1.0);
+                    }
+
+                    string styleKey = $"FULL|{fullBarGlassStyle.Id}|{fullBarGlassStyle.SurfaceTheme}|{fullBarGlassStyle.BackgroundTintHex}|{fullBarGlassStyle.BackgroundOpacity:0.00}|{fullBarGlassStyle.BackgroundBlurIntensity:0.0}|{fullBarGlassStyle.BorderThickness:0.0}|{fullBarGlassStyle.BorderColorHex}|{trayRect.Width}|{trayRect.Height}|{_settings.LastAppliedImagePath}";
+
+                    if (!string.Equals(cache.CachedStyleKey, styleKey, StringComparison.Ordinal))
+                    {
+                        double monDpi = targetMon != null ? Math.Max(96.0, targetMon.DpiX) / 96.0 : dpi;
+                        double relMonX = targetMon != null ? (trayRect.Left - targetMon.Bounds.X) / monDpi : trayRect.Left / dpi;
+                        double relMonY = targetMon != null ? (trayRect.Top - targetMon.Bounds.Y) / monDpi : trayRect.Top / dpi;
+
+                        cache.CachedSlice = fullBarGlassStyle.SurfaceTheme == WidgetSurfaceTheme.Glassmorphism && fullBarGlassStyle.EnableBackdropBlur
+                            ? _wallpaperSampler.CreateBlurredCropSlice(
+                                targetMon,
+                                _settings.LastAppliedImagePath,
+                                relMonX,
+                                relMonY,
+                                trayRect.Width / monDpi,
+                                trayRect.Height / monDpi,
+                                fullBarGlassStyle.BackgroundBlurIntensity,
+                                addFrostGrain: true)
+                            : null;
+                        cache.CachedStyleKey = styleKey;
+                    }
+
+                    cache.CachedLeftPx = trayRect.Left;
+                    cache.CachedHeightPx = trayRect.Height;
+                    cache.LastTrayTopPx = trayRect.Top;
+                    cache.TargetMonitor = targetMon;
+                    cache.DpiScale = dpi;
+                    cache.IsFullBar = true;
+
+                    dockWin.UpdateDockPhysicalRectAndStyle(
+                        trayRect.Left,
+                        trayRect.Top,
+                        trayRect.Width,
+                        trayRect.Height,
+                        dpi,
+                        dockOpacity,
+                        fullBarGlassStyle,
+                        cache.CachedSlice,
+                        styleKey,
+                        tray.Hwnd,
+                        isFullBar: true);
+                }
+
+                if (_settings.CenterTaskbarIcons)
                 {
                     var (taskSwHwnd, taskListHwnd) = FindTaskListWindows(tray.Hwnd, tray.IsPrimary);
                     if (taskSwHwnd != IntPtr.Zero && taskListHwnd != IntPtr.Zero &&
                         GetWindowRect(taskSwHwnd, out var swRect))
                     {
-                        double dpi = Math.Max(96.0, GetDpiForWindow(tray.Hwnd)) / 96.0;
                         var (bounds, querySucceeded) = MeasureTaskButtonClusterBounds(taskListHwnd, swRect, trayRect);
                         int clusterWidthPx = bounds.WidthPx;
 
@@ -454,7 +549,7 @@ public sealed class TaskbarTweaksService : IDisposable
 
                             int actualClusterLeftPx = bounds.LeftPx + actualShiftPx;
 
-                            if (showDockHere)
+                            if (showDockBackdrop)
                             {
                                 activeDockTrays.Add(tray.Hwnd);
 
@@ -470,13 +565,6 @@ public sealed class TaskbarTweaksService : IDisposable
                                 double dockDipW = physDockW / dpi;
                                 double dockDipTop = physDockTop / dpi;
 
-                                var targetMon = monitors.FirstOrDefault(m =>
-                                    trayRect.Left >= m.Bounds.X - 40 && trayRect.Left < m.Bounds.Right + 40);
-
-                                double monBottom = targetMon != null ? targetMon.Bounds.Bottom : trayRect.Bottom;
-                                double visibleFrac = Math.Clamp((monBottom - trayRect.Top) / Math.Max(28.0, trayRect.Height), 0.0, 1.0);
-                                double dockOpacity = visibleFrac <= 0.08 ? 0.0 : Math.Clamp((visibleFrac - 0.08) / 0.72, 0.0, 1.0);
-
                                 if (!_dockWindows.TryGetValue(tray.Hwnd, out var dockWin))
                                 {
                                     dockWin = new TaskbarDockOverlayWindow();
@@ -489,7 +577,7 @@ public sealed class TaskbarTweaksService : IDisposable
                                     _dockCaches[tray.Hwnd] = cache;
                                 }
 
-                                string styleKey = $"{_glassStyle.Id}|{_glassStyle.SurfaceTheme}|{_glassStyle.BackgroundTintHex}|{_glassStyle.BackgroundOpacity:0.00}|{_glassStyle.BackgroundBlurIntensity:0.0}|{_glassStyle.CornerRadius:0.0}|{_glassStyle.BorderThickness:0.0}|{_glassStyle.BorderColorHex}|{physDockW}|{physDockH}|{_settings.LastAppliedImagePath}";
+                                string styleKey = $"DOCK|{_glassStyle.Id}|{_glassStyle.SurfaceTheme}|{_glassStyle.BackgroundTintHex}|{_glassStyle.BackgroundOpacity:0.00}|{_glassStyle.BackgroundBlurIntensity:0.0}|{_glassStyle.CornerRadius:0.0}|{_glassStyle.BorderThickness:0.0}|{_glassStyle.BorderColorHex}|{physDockW}|{physDockH}|{_settings.LastAppliedImagePath}";
                                 if (!string.Equals(cache.CachedStyleKey, styleKey, StringComparison.Ordinal))
                                 {
                                     double monDpi = targetMon != null ? Math.Max(96.0, targetMon.DpiX) / 96.0 : dpi;
@@ -515,6 +603,7 @@ public sealed class TaskbarTweaksService : IDisposable
                                 cache.LastTrayTopPx = trayRect.Top;
                                 cache.TargetMonitor = targetMon;
                                 cache.DpiScale = dpi;
+                                cache.IsFullBar = false;
 
                                 dockWin.UpdateDockPhysicalRectAndStyle(
                                     physDockLeft,
@@ -526,7 +615,8 @@ public sealed class TaskbarTweaksService : IDisposable
                                     _glassStyle,
                                     cache.CachedSlice,
                                     styleKey,
-                                    tray.Hwnd);
+                                    tray.Hwnd,
+                                    isFullBar: false);
                             }
                         }
                     }
@@ -565,7 +655,7 @@ public sealed class TaskbarTweaksService : IDisposable
             try
             {
                 ShowWindow(tray.Hwnd, SW_SHOW);
-                SetTrayAccentPolicy(tray.Hwnd, AccentState.ACCENT_DISABLED, 0);
+                RestoreTaskbarOpaque(tray.Hwnd);
                 ResetTaskListAlignment(tray.Hwnd, tray.IsPrimary);
             }
             catch { }
@@ -812,6 +902,58 @@ public sealed class TaskbarTweaksService : IDisposable
             if (Math.Abs(listRect.Left - swRect.Left) > 2)
                 SetWindowPos(list, IntPtr.Zero, 0, 0, swRect.Width, swRect.Height, SWP_NOZORDER | SWP_NOACTIVATE);
         }
+    }
+
+    private static void MakeTaskbarTransparent(IntPtr trayHwnd)
+    {
+        SetTrayAccentPolicy(trayHwnd, AccentState.ACCENT_ENABLE_TRANSPARENTGRADIENT, 0x01000000);
+        var margins = new MARGINS { cxLeftWidth = -1, cxRightWidth = -1, cyTopHeight = -1, cyBottomHeight = -1 };
+        try { DwmExtendFrameIntoClientArea(trayHwnd, ref margins); } catch { }
+
+        EnumChildWindows(trayHwnd, (child, _) =>
+        {
+            try
+            {
+                var sb = new StringBuilder(64);
+                if (GetClassName(child, sb, sb.Capacity) > 0)
+                {
+                    string cls = sb.ToString();
+                    if (cls.Contains("Xaml") || cls.Contains("WorkerW") || cls.Contains("ReBarWindow32"))
+                    {
+                        SetTrayAccentPolicy(child, AccentState.ACCENT_ENABLE_TRANSPARENTGRADIENT, 0x01000000);
+                        DwmExtendFrameIntoClientArea(child, ref margins);
+                    }
+                }
+            }
+            catch { }
+            return true;
+        }, IntPtr.Zero);
+    }
+
+    private static void RestoreTaskbarOpaque(IntPtr trayHwnd)
+    {
+        SetTrayAccentPolicy(trayHwnd, AccentState.ACCENT_DISABLED, 0);
+        var margins = new MARGINS { cxLeftWidth = 0, cxRightWidth = 0, cyTopHeight = 0, cyBottomHeight = 0 };
+        try { DwmExtendFrameIntoClientArea(trayHwnd, ref margins); } catch { }
+
+        EnumChildWindows(trayHwnd, (child, _) =>
+        {
+            try
+            {
+                var sb = new StringBuilder(64);
+                if (GetClassName(child, sb, sb.Capacity) > 0)
+                {
+                    string cls = sb.ToString();
+                    if (cls.Contains("Xaml") || cls.Contains("WorkerW") || cls.Contains("ReBarWindow32"))
+                    {
+                        SetTrayAccentPolicy(child, AccentState.ACCENT_DISABLED, 0);
+                        DwmExtendFrameIntoClientArea(child, ref margins);
+                    }
+                }
+            }
+            catch { }
+            return true;
+        }, IntPtr.Zero);
     }
 
     private static void SetTrayAccentPolicy(IntPtr hwnd, AccentState state, uint gradientColorAbgr)

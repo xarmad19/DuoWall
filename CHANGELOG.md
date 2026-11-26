@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.0.1] - 2026-11-26
+
+### 🌟 Headline Improvements
+
+Version 2.0.1 delivers full universal glassmorphic theme styling directly to the Windows taskbar, adds seamless in-place upgrade and fresh-install engine capabilities to the Inno Setup installer, and establishes an interactive release versioning workflow.
+
+---
+
+### 🪟 Taskbar Universal Glass Theme & Win+D Protection
+- **Universal Glass Styling on Windows Taskbar**:
+  - Full-bar optical glass backdrop rendering seamlessly beneath the native Windows taskbar across both Windows 10 and modern Windows 11 builds (22H2, 23H2, 24H2).
+  - Fixed Windows 11 XAML Island (`DesktopWindowXamlSource`) occlusion by applying transparent gradient accents (`ACCENT_ENABLE_TRANSPARENTGRADIENT`) and full DWM client-area frame extensions (`DwmExtendFrameIntoClientArea`) across `Shell_TrayWnd` and child handles.
+  - Dynamically extracts and renders high-fidelity SkiaSharp blurred crop slices from the active desktop wallpaper behind the exact taskbar bounding rectangle.
+  - Renders sharp zero-radius edge-to-edge glass framing with customizable opacity (`TaskbarAcrylicOpacity`), optical border highlight, and glass tint.
+  - Keeps native Start menu, taskbar icons, system tray notification icons, and clock fully interactive and layered above the glass surface.
+- **Win + D Desktop Shell Attachment**:
+  - Attached taskbar overlay windows to the desktop shell owner (`GWLP_HWNDPARENT` -> `SHELLDLL_DefView` / `Progman`), ensuring the glass backdrop is never minimized when invoking Win + D (Show Desktop).
+- **Synchronized Auto-Hide Tracking**:
+  - 60Hz WinEvent tracking smoothly slides the taskbar glass overlay in lock-step with Windows auto-hide animations on primary and secondary displays.
+
+---
+
+### 📦 Setup Installer Dual Engine (Fresh Install & Seamless Upgrade)
+- **Restart Manager & Single-Instance Mutex Detection**:
+  - Inno Setup installer now tracks `AppMutex=DuoWallBySRMD_SingleInstance_Mutex` with native Windows Restart Manager integration (`CloseApplications=yes`, `RestartApplications=yes`).
+  - Running instances of DuoWall are cleanly closed before overwriting application binaries, preventing process termination crashes.
+- **In-Place File Replacement (`restartreplace`)**:
+  - Files marked with `restartreplace` ensure atomic replacement of binaries and libraries even if temporarily in use.
+- **User Data & Database Preservation**:
+  - Upgrading automatically detects existing installations via `AppId={{5A8C3D21-7B32-4E9A-A372-F9D1E4E8D201}}`, preserving install paths (`UsePreviousAppDir=yes`), start menu shortcuts (`UsePreviousGroup=yes`), and desktop preferences (`UsePreviousTasks=yes`).
+  - User database (`duowall.db`), custom widget packages (`.dwwp`), glass presets, and downloaded wallpapers stored in `%LOCALAPPDATA%\DuoWallBySRMD` remain completely untouched during updates.
+- **Dual Support**:
+  - Seamlessly acts as a clean, stand-alone installer on brand-new PCs, or as an automatic in-place updater for previously installed versions.
+
+---
+
 ## [2.0.0] - 2026-11-13
 
 ### 🌟 Headline Features

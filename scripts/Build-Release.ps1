@@ -3,7 +3,7 @@
     Builds, tests, publishes, packages, and generates SHA-256 checksums for DuoWall by SRMD.
 #>
 param(
-    [string]$Version = "2.0.0"
+    [string]$Version = "2.0.1"
 )
 
 $ErrorActionPreference = "Stop"
@@ -47,8 +47,8 @@ $iscc = $isccCandidates | Where-Object { Test-Path $_ } | Select-Object -First 1
 $setupExe = Join-Path $root "publish\DuoWall-v$Version-Setup.exe"
 
 if ($iscc) {
-    Write-Host "Compiling Inno Setup installer via $iscc..." -ForegroundColor Cyan
-    & $iscc (Join-Path $root "installer\DuoWall.iss")
+    Write-Host "Compiling Inno Setup installer via $iscc with version $Version..." -ForegroundColor Cyan
+    & $iscc "/DMyAppVersion=$Version" (Join-Path $root "installer\DuoWall.iss")
     if ($LASTEXITCODE -ne 0) { throw "Inno Setup compilation failed." }
 } else {
     Write-Warning "ISCC.exe not found. Setup installer skipped."
