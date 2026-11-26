@@ -43,6 +43,15 @@ Version 2.0.1 delivers full universal glassmorphic theme styling directly to the
 
 ---
 
+### ℹ️ Dynamic Version Resolution in About Me & Update Checker
+- **Centralized `AppVersionInfo` Engine**:
+  - Dynamically extracts the active build version from assembly manifest attributes (`AssemblyInformationalVersionAttribute` / `AssemblyVersion`), removing static hardcoded `"v2.0.0"` strings.
+  - **About Me Dialog**: Version badge dynamically displays the true runtime version (`v2.0.1`).
+  - **Check for Updates**: Compares GitHub releases against dynamic `AppVersionInfo.Version` (`2.0.1`), accurately notifying users when up to date and reporting the correct active version.
+  - **Settings View**: Title bar and footer dynamically bind to `AppVersionDisplay`.
+
+---
+
 ## [2.0.0] - 2026-11-13
 
 ### 🌟 Headline Features

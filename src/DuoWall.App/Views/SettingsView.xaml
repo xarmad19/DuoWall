@@ -183,7 +183,7 @@
                             </ui:Button>
                         </StackPanel>
                         <StackPanel>
-                            <TextBlock Text="DuoWall by SRMD · Version 2.0.0" FontSize="14" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding AppVersionDisplay}" FontSize="14" FontWeight="SemiBold" />
                             <TextBlock Text="Native .NET 8 WPF multi-monitor wallpaper compositor, Glassmorphism Widget Studio &amp; Adaptive Profiles"
                                        FontSize="12" Foreground="{DynamicResource TextFillColorSecondaryBrush}" />
                         </StackPanel>

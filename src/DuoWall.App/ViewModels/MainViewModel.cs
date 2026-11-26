@@ -152,6 +152,8 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
     [ObservableProperty] private bool _isVideoWallpaperStaged;
     private string? _stagedLiveVideoPath;
 
+    public string AppVersionDisplay => AppVersionInfo.FullProductTitle;
+
     public WidgetStudioViewModel WidgetStudio { get; }
     public ProfilesViewModel Profiles { get; }
     public LiveWallpaperViewModel LiveWallpaper { get; }
@@ -1521,8 +1523,9 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
             : GitHubRepositorySlug.Trim();
         _db.SaveSettings(Settings);
 
+        string currentVersion = AppVersionInfo.Version;
         SetStatus("Checking official GitHub Releases for newer DuoWall versions...", isError: false);
-        var result = await _releaseService.CheckLatestReleaseAsync("2.0.0", Settings.GitHubRepositorySlug);
+        var result = await _releaseService.CheckLatestReleaseAsync(currentVersion, Settings.GitHubRepositorySlug);
         if (!string.IsNullOrWhiteSpace(result.ReleasePageUrl))
         {
             LatestReleasePageUrl = result.ReleasePageUrl;
@@ -1531,7 +1534,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
 
         if (result.UpdateAvailable)
         {
-            var msg = $"A newer version of DuoWall is available: v{result.LatestVersion}!\n\nCurrent version: v2.0.0\n\nWould you like to open the GitHub Releases page to view notes and download?";
+            var msg = $"A newer version of DuoWall is available: v{result.LatestVersion}!\n\nCurrent version: v{currentVersion}\n\nWould you like to open the GitHub Releases page to view notes and download?";
             if (MessageBox.Show(msg, "DuoWall - Update Available", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
             {
                 OpenReleasePage();
@@ -1539,7 +1542,7 @@ public sealed partial class MainViewModel : ObservableObject, IDisposable
         }
         else if (result.Success)
         {
-            MessageBox.Show($"You are using the latest version of DuoWall (v2.0.0).\n\nYour installation is up to date!", "DuoWall - Up to Date", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show($"You are using the latest version of DuoWall (v{currentVersion}).\n\nYour installation is up to date!", "DuoWall - Up to Date", MessageBoxButton.OK, MessageBoxImage.Information);
         }
         else
         {

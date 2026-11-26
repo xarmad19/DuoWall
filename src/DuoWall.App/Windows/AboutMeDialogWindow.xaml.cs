@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Input;
+using DuoWall.Core.Services;
 
 namespace DuoWall.App.Windows;
 
@@ -9,6 +10,7 @@ public partial class AboutMeDialogWindow : Window
     public AboutMeDialogWindow()
     {
         InitializeComponent();
+        VersionBadgeText.Text = AppVersionInfo.DisplayVersion;
         MouseDown += (s, e) =>
         {
             if (e.LeftButton == MouseButtonState.Pressed)

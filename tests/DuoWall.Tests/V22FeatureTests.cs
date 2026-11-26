@@ -432,6 +432,23 @@ public sealed class V22FeatureTests : IDisposable
         Assert.Contains("#ifndef MyAppVersion", issContent);
     }
 
+    [Fact]
+    public void AppVersionInfo_ResolvesValidSemanticVersion()
+    {
+        string ver = AppVersionInfo.Version;
+        Assert.False(string.IsNullOrWhiteSpace(ver));
+        Assert.True(Version.TryParse(ver, out var parsedVer), $"Expected '{ver}' to be a valid Version string");
+        Assert.True(parsedVer.Major >= 2);
+
+        string display = AppVersionInfo.DisplayVersion;
+        Assert.StartsWith("v", display);
+        Assert.Equal($"v{ver}", display);
+
+        string full = AppVersionInfo.FullProductTitle;
+        Assert.Contains("DuoWall by SRMD", full);
+        Assert.Contains(ver, full);
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_tempDir, recursive: true); } catch { }

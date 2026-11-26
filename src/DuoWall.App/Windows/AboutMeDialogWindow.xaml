@@ -32,7 +32,7 @@
                         <TextBlock Text="DuoWall" FontSize="20" FontWeight="Bold" Foreground="#F8FAFC" />
                         <TextBlock Text=" by SRMD" FontSize="18" FontWeight="SemiBold" Foreground="#38BDF8" Margin="0,0,8,0" />
                         <Border Background="#1E293B" BorderBrush="#475569" BorderThickness="1" CornerRadius="6" Padding="6,2" VerticalAlignment="Center">
-                            <TextBlock Text="v2.0.0" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" />
+                            <TextBlock x:Name="VersionBadgeText" Text="v2.0.1" FontSize="11" FontWeight="Bold" Foreground="#38BDF8" />
                         </Border>
                     </StackPanel>
                     <TextBlock Text="Ultimate Multi-Monitor Panoramic Wallpaper &amp; Glass Widget Suite"

@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text.Json;
+using DuoWall.Core.Services;
 using DuoWall.Core.Theming;
 using DuoWall.Core.Widgets;
 
@@ -222,7 +223,7 @@ public sealed class LocalWidgetMarketplaceProvider : IWidgetMarketplaceProvider
 /// </summary>
 public sealed class WidgetPackageService
 {
-    public const string CurrentAppVersion = "2.0.0";
+    public static string CurrentAppVersion => AppVersionInfo.Version;
 
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
